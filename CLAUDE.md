@@ -25,17 +25,20 @@ Intended to be distributed to friends and made publicly available on GitHub.
 src/          C++ source files
 include/      Header files
 data/         LittleFS partition — captive portal / settings web UI
-.github/      GitHub Actions CI — builds firmware on every push
+scripts/      PlatformIO pre-scripts (version.py injects git tag as FIRMWARE_VERSION)
+partitions.csv  Custom 8MB OTA partition layout (two 3MB app slots + ~2MB LittleFS)
+.github/      GitHub Actions CI — builds firmware and publishes releases on v*.*.* tags
 ```
 
 | Module | Responsibility |
 |--------|---------------|
 | `main.cpp` | `setup()` / `loop()` — minimal wiring |
 | `radar.cpp` | Geometry: distance, bearing, screen projection |
-| `display.cpp` | Canvas, sweep, pings, landmarks, waterways, grid, clock, wind widget |
+| `display.cpp` | Canvas, sweep, pings, landmarks, waterways, grid, clock, wind widget, OTA popup |
 | `fetch.cpp` | WiFi, TLS, HTTP, JSON parsing, FreeRTOS tasks, all data fetches |
 | `storage.cpp` | NVS read/write via `Preferences` |
 | `portal.cpp` | Captive portal (initial setup) + settings web server (post-setup) |
+| `ota.cpp` | GitHub Releases version check, `HTTPUpdate` OTA flash, nightly + manual trigger |
 
 ## Credential & config philosophy
 **No credentials or user-specific data exist anywhere in the codebase.**
@@ -190,7 +193,32 @@ for (int i = 0; i < len; i++) {
 - [x] Captive portal (`RempyRadar-Setup` AP → web form → NVS → reboot)
 - [x] Post-setup settings web server (accessible at device IP)
 - [x] Airport landmarks — auto-fetched via Overpass, cached in NVS, IATA labels preferred
-- [x] Waterway overlay — rivers + coastline streamed from Overpass, drawn each boot
+- [x] Waterway overlay — rivers + coastline streamed from Overpass, drawn each boot; runtime toggle in settings
+- [x] OTA firmware updates — nightly 3 am GitHub Releases check + manual "Check for updates" button; on-device status popup; CI publishes `.bin` on version tag push
+
+## OTA update architecture
+
+- **Partition table:** `partitions.csv` — two 3 MB OTA app slots (`ota_0` / `ota_1`) + ~2 MB LittleFS.
+  First flash must be wired (USB); all subsequent updates can be over WiFi.
+- **Version injection:** `scripts/version.py` pre-script runs `git describe --tags --exact-match`
+  at build time and injects the result as `-DFIRMWARE_VERSION="v1.2.3"`. Non-tagged builds get `"dev"`.
+- **`otaInit()`** called at top of `setup()` — calls `esp_ota_mark_app_valid_cancel_rollback()` to
+  confirm the running slot is healthy.
+- **`otaCheckIfDue()`** called at end of every `fetchTask` cycle:
+  - **Scheduled:** at 3 am local time (once per calendar day via `g_lastCheckedDay`)
+  - **Forced:** if `g_forcePending` is set by `otaTriggerCheck()` — jumps the fetch queue, runs
+    before `fetchAircraft()` and other fetches so the popup appears immediately
+- **Check flow:** TLS connect to `api.github.com` → parse `tag_name` + `.bin` asset URL →
+  compare to `FIRMWARE_VERSION` → if newer, stream via `HTTPUpdate` + `WiFiClientSecure`
+  (insecure, consistent with rest of codebase) with redirect following enabled.
+- **Display feedback:** `displaySetOtaStatus(msg, durationMs)` in `display.cpp` sets a retro
+  green popup rendered on top of the radar. Permanent (durationMs=0) until replaced; timed
+  messages auto-clear. Written from core 1, read from core 0 — intentionally unsynchronised
+  (worst case: one frame of garbled text, imperceptible at 50 fps).
+- **CI release job:** triggers on `v*.*.*` tags; builds with the tag as `FIRMWARE_VERSION`;
+  creates a GitHub Release with `firmware.bin` attached via `softprops/action-gh-release`.
+- **Web UI:** `/ota-check` POST route calls `otaTriggerCheck()`; `/config` JSON includes
+  `firmware` field so the settings page can display the running version.
 
 ## Planned / in progress
 
@@ -203,3 +231,4 @@ for (int i = 0; i < len; i++) {
 - **Wind:** `api.open-meteo.com` — free, no API key. `GET /v1/forecast?latitude=...&longitude=...&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn&forecast_days=1`
 - **Airports + waterways:** `overpass-api.de` (OpenStreetMap Overpass API) — free, no API key
 - **Geocoding:** `nominatim.openstreetmap.org` — free, no API key
+- **OTA update check:** `api.github.com/repos/Tom-bass/RempyRadar/releases/latest` — free, no API key, 60 req/hr unauthenticated (once/day is fine)

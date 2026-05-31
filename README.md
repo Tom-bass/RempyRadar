@@ -41,7 +41,14 @@ Both steps are required on a fresh device. The setup web page lives in a separat
 partition — if `uploadfs` is skipped the captive portal serves a 503 error.
 
 **When to re-run `uploadfs`:** only when files in `data/` change (web UI). Firmware-only changes
-just need `upload`.
+just need `upload`. Exception: if the partition table has changed (e.g. first flash after adding
+OTA support), run both — the LittleFS partition moves to a new flash address.
+
+### OTA partition layout
+
+The project uses a custom `partitions.csv` with two equal 3 MB app slots for OTA updates.
+A fresh USB flash writes the new partition table automatically. After that, firmware updates
+are delivered over WiFi — no cable needed.
 
 PSRAM is enabled via `platformio.ini`:
 ```ini
@@ -77,7 +84,22 @@ Settings available via the portal (also reachable at the device IP after setup):
 | Show trails | Fading path behind each aircraft |
 | Altitude colours | Colour-code aircraft by altitude |
 | Show airports | Draw nearby airport markers |
+| Show waterways | Rivers and coastline overlaid on the radar (can be disabled to save boot time) |
 | Altitude palette | Classic Rainbow / Fire / Ocean / Monochrome / Custom |
+
+---
+
+## OTA Updates
+
+Firmware updates are delivered automatically over WiFi — no USB cable required after the first flash.
+
+- **Nightly check** — at 3 am local time the device queries the GitHub Releases API. If a release
+  tag newer than the running firmware is found it downloads and flashes the `.bin`, then reboots.
+- **Manual check** — a **Check for updates** button in the settings page triggers the same check
+  immediately. Status is shown on the device display in a retro green popup.
+- **Releasing a new version** — push a git tag matching `v*.*.*`. GitHub Actions builds the
+  firmware with that version string baked in and attaches `firmware.bin` to the release.
+  Devices in the field pick it up that night.
 
 ---
 
@@ -119,6 +141,7 @@ Settings available via the portal (also reachable at the device IP after setup):
 | Airports + waterways | `overpass-api.de` (OpenStreetMap) | None |
 | Geocoding | `nominatim.openstreetmap.org` | None |
 | Time | `pool.ntp.org` NTP | None |
+| OTA update check | `api.github.com` (GitHub Releases) | None |
 
 ---
 
