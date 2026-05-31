@@ -28,6 +28,15 @@ constexpr int           REBOOT_AFTER_N_FETCHES = 4320;
 // --- Wind fetch ---
 constexpr int WIND_FETCH_EVERY_N_FETCHES = 30;  // ~10 min at 20s intervals
 
+// --- OTA update source ---
+#define OTA_GITHUB_OWNER "Tom-bass"
+#define OTA_GITHUB_REPO  "RempyRadar"
+
+// Injected by scripts/version.py at build time; falls back to "dev" for local builds.
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "dev"
+#endif
+
 // --- Optional features (comment out to disable) ---
 #define FEATURE_WATERWAYS
 constexpr int MAX_WATER_POLYS    = 20;

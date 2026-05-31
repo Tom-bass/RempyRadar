@@ -25,6 +25,7 @@ struct DeviceConfig {
     bool     showAltColors;        // false = all aircraft render as plain green
     bool     showAirports;         // false = skip airport fetch and landmarks
     bool     showAirportNames;     // false = dot only, no IATA/ICAO label
+    bool     showWaterways;        // false = skip waterway fetch and overlay
     bool     showClimbDescent;    // show +/- climb/descent indicator after callsign
     bool     showFlightNumber;    // show callsign / flight number label on pings
     bool     showFlightReg;       // show aircraft registration below flight number

@@ -67,7 +67,14 @@ static RGBColor     g_customAltColors[10];
 #ifdef FEATURE_WATERWAYS
 static WaterPolyline g_waterPolys[MAX_WATER_POLYS];
 static int           g_waterPolyCount = 0;
+static bool          g_showWaterways  = true;
 #endif
+
+// OTA status popup — written from core 1, read from core 0.
+// Intentionally unsynchronized: worst case is one frame of garbled text, which is imperceptible.
+static char          g_otaMsg[32]   = "";
+static unsigned long g_otaUntil     = 0;    // millis deadline; 0 = permanent until replaced
+static volatile bool g_otaVisible   = false;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -186,6 +193,9 @@ void displayApplyConfig(const DeviceConfig &cfg) {
     g_showAltColors     = cfg.showAltColors;
     g_showAirports      = cfg.showAirports;
     g_showAirportNames  = cfg.showAirportNames;
+#ifdef FEATURE_WATERWAYS
+    g_showWaterways     = cfg.showWaterways;
+#endif
     g_airportColor565   = color565(cfg.airportColor.r, cfg.airportColor.g, cfg.airportColor.b);
     g_showClimbDescent    = cfg.showClimbDescent;
     g_showFlightNumber    = cfg.showFlightNumber;
@@ -303,7 +313,7 @@ static void drawLandmark(float homeLat, float homeLon, float radiusKm,
 
 static void drawRadarGrid(float homeLat, float homeLon, float radiusKm) {
 #ifdef FEATURE_WATERWAYS
-    drawWaterways(homeLat, homeLon, radiusKm);
+    if (g_showWaterways) drawWaterways(homeLat, homeLon, radiusKm);
 #endif
     g_canvas->drawCircle(CENTRE_X, CENTRE_Y, RADAR_R,          g_ringColor565);
     g_canvas->drawCircle(CENTRE_X, CENTRE_Y, RADAR_R * 2 / 3, g_ringColor565);
@@ -762,6 +772,43 @@ static void drawWindWidget() {
 }
 
 // ---------------------------------------------------------------------------
+// OTA status popup
+// ---------------------------------------------------------------------------
+
+void displaySetOtaStatus(const char *msg, unsigned long durationMs) {
+    strncpy(g_otaMsg, msg, sizeof(g_otaMsg) - 1);
+    g_otaMsg[sizeof(g_otaMsg) - 1] = '\0';
+    g_otaUntil   = durationMs > 0 ? millis() + durationMs : 0;
+    g_otaVisible = true;
+}
+
+static void drawOtaPopup() {
+    // Centered box, sits above the clock/wind widgets in the lower-middle region.
+    // Fits well within the 240px circle at this position.
+    const int bx = 20, by = 104, bw = 200, bh = 36;
+
+    // Dark background so text is legible over sweep and pings
+    g_canvas->fillRect(bx, by, bw, bh, 0x0000);
+    // Outer border — medium green, matches ring style
+    g_canvas->drawRect(bx, by, bw, bh, color565(0, 100, 0));
+
+    // Two 8px text lines with equal 6px margins: 6+8+6+8+6 = 34px inner height.
+    // setCursor x = CENTRE_X - len*3 centres each string (textSize=1: 6px/char, half = 3px/char).
+
+    const char *header = "[ OTA UPDATE ]";
+    int hlen = strlen(header);
+    g_canvas->setTextColor(color565(0, 70, 0));
+    g_canvas->setTextSize(1);
+    g_canvas->setCursor(CENTRE_X - hlen * 3, by + 7);
+    g_canvas->print(header);
+
+    int mlen = strlen(g_otaMsg);
+    g_canvas->setTextColor(color565(0, 255, 0));
+    g_canvas->setCursor(CENTRE_X - mlen * 3, by + 21);
+    g_canvas->print(g_otaMsg);
+}
+
+// ---------------------------------------------------------------------------
 // Public render entry point
 // ---------------------------------------------------------------------------
 
@@ -781,6 +828,14 @@ void displayRenderFrame(Adafruit_GC9A01A &tft,
     drawPingLabels();
     if (g_showClock) drawClock();
     if (g_showWind)  drawWindWidget();
+
+    if (g_otaVisible) {
+        if (g_otaUntil == 0 || millis() < g_otaUntil) {
+            drawOtaPopup();
+        } else {
+            g_otaVisible = false;
+        }
+    }
 
     tft.drawRGBBitmap(0, 0, g_canvas->getBuffer(), 240, 240);
 

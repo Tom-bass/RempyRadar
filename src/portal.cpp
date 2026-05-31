@@ -1,5 +1,7 @@
 #include "portal.h"
 #include "storage.h"
+#include "config.h"
+#include "ota.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
@@ -111,6 +113,7 @@ static void handleSave() {
     cfg.showAltColors  = g_server.hasArg("showAltColors");
     cfg.showAirports      = g_server.hasArg("showAirports");
     cfg.showAirportNames  = g_server.hasArg("showAirportNames");
+    cfg.showWaterways     = g_server.hasArg("showWaterways");
     cfg.showClimbDescent  = g_server.hasArg("showClimbDescent");
     cfg.showFlightNumber  = g_server.hasArg("showFlightNumber");
     cfg.showFlightReg          = g_server.hasArg("showFlightReg");
@@ -197,12 +200,18 @@ static void handleSave() {
     }
 }
 
+static void handleOtaCheck() {
+    otaTriggerCheck();
+    g_server.send(200, "text/plain", "ok");
+}
+
 static void handleConfig() {
     DeviceConfig cfg;
     storageLoad(cfg);
 
     static StaticJsonDocument<1536> doc;
     doc.clear();
+    doc["firmware"]      = FIRMWARE_VERSION;
     doc["ssid"]          = cfg.wifiSSID;
     doc["pass"]          = cfg.wifiPass;
     doc["lat"]           = cfg.homeLat;
@@ -227,6 +236,7 @@ static void handleConfig() {
     doc["showAltColors"] = cfg.showAltColors;
     doc["showAirports"]      = cfg.showAirports;
     doc["showAirportNames"]  = cfg.showAirportNames;
+    doc["showWaterways"]     = cfg.showWaterways;
     doc["showClimbDescent"]  = cfg.showClimbDescent;
     doc["showFlightNumber"]  = cfg.showFlightNumber;
     doc["showFlightReg"]        = cfg.showFlightReg;
@@ -267,10 +277,11 @@ void portalStartSettingsServer() {
     if (!LittleFS.begin(true)) {
         Serial.println("Settings: LittleFS mount failed");
     }
-    g_server.on("/",           handleRoot);
-    g_server.on("/index.html", handleRoot);
-    g_server.on("/config",     handleConfig);
-    g_server.on("/save", HTTP_POST, handleSave);
+    g_server.on("/",                 handleRoot);
+    g_server.on("/index.html",       handleRoot);
+    g_server.on("/config",           handleConfig);
+    g_server.on("/save",      HTTP_POST, handleSave);
+    g_server.on("/ota-check", HTTP_POST, handleOtaCheck);
     g_server.onNotFound(handleRoot);
     g_server.begin();
     Serial.println("Settings: server started at http://" + WiFi.localIP().toString());

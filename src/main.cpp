@@ -11,6 +11,7 @@
 #include "fetch.h"
 #include "radar.h"
 #include "portal.h"
+#include "ota.h"
 
 static Adafruit_GC9A01A tft(TFT_CS, TFT_DC, TFT_RST);
 static Adafruit_MPU6050 mpu;
@@ -25,6 +26,8 @@ void setup() {
 
     // Push allocations >4KB to PSRAM, keeping internal RAM free for TLS
     heap_caps_malloc_extmem_enable(4096);
+
+    otaInit();
 
     displayInit(tft);
 

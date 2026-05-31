@@ -3,6 +3,7 @@
 #include "radar.h"
 #include "storage.h"
 #include "display.h"
+#include "ota.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
@@ -881,6 +882,14 @@ static void fetchTask(void *) {
             continue;
         }
 
+        // Manual OTA check runs first so the display popup appears immediately.
+        // The scheduled 3am check runs at the end of the cycle instead.
+        if (otaIsForced()) {
+            otaCheckIfDue();
+            vTaskDelay(FETCH_INTERVAL_MS / portTICK_PERIOD_MS);
+            continue;
+        }
+
         // Resolve address to coordinates on first fetch if needed
         if (strlen(g_cfg.homeAddress) > 0 &&
             g_cfg.homeLat == 0.0f && g_cfg.homeLon == 0.0f) {
@@ -897,7 +906,7 @@ static void fetchTask(void *) {
             g_airportsFetched = fetchAirports();
 
 #ifdef FEATURE_WATERWAYS
-        if (!g_waterwaysFetched && g_waterwayRetries < 5) {
+        if (g_cfg.showWaterways && !g_waterwaysFetched && g_waterwayRetries < 5) {
             if (!(g_waterwaysFetched = fetchWaterways()))
                 g_waterwayRetries++;
         }
@@ -906,6 +915,8 @@ static void fetchTask(void *) {
         if (!g_windStaging.valid || g_fetchCount % WIND_FETCH_EVERY_N_FETCHES == 1) {
             fetchWindData();
         }
+
+        otaCheckIfDue();
 
         vTaskDelay(FETCH_INTERVAL_MS / portTICK_PERIOD_MS);
     }
@@ -968,14 +979,15 @@ bool fetchConsumeStagingIfReady(Plane *dest, int *count) {
 bool fetchGeocodeFailed() { return g_geocodeFailed; }
 
 void fetchUpdateConfig(const DeviceConfig &cfg) {
-    g_cfg.homeLat      = cfg.homeLat;
-    g_cfg.homeLon      = cfg.homeLon;
-    g_cfg.radiusKm     = cfg.radiusKm;
-    g_cfg.showAirports = cfg.showAirports;
-    g_airportsFetched  = false;
+    g_cfg.homeLat        = cfg.homeLat;
+    g_cfg.homeLon        = cfg.homeLon;
+    g_cfg.radiusKm       = cfg.radiusKm;
+    g_cfg.showAirports   = cfg.showAirports;
+    g_airportsFetched    = false;
 #ifdef FEATURE_WATERWAYS
-    g_waterwaysFetched = false;
-    g_waterwayRetries  = 0;
+    g_cfg.showWaterways  = cfg.showWaterways;
+    g_waterwaysFetched   = false;
+    g_waterwayRetries    = 0;
 #endif
 }
 

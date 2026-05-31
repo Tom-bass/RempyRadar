@@ -14,6 +14,7 @@ bool storageLoad(DeviceConfig &cfg) {
     cfg.showAltColors  = true;
     cfg.showAirports      = true;
     cfg.showAirportNames  = true;
+    cfg.showWaterways     = true;
     cfg.airportColor             = { 120, 120, 0 };
     cfg.showClimbDescent  = true;
     cfg.showFlightNumber  = true;
@@ -46,6 +47,7 @@ bool storageLoad(DeviceConfig &cfg) {
         cfg.showAltColors  = prefs.getBool("showAltClr",  true);
         cfg.showAirports      = prefs.getBool("showAirports",     true);
         cfg.showAirportNames  = prefs.getBool("showAirportNames", true);
+        cfg.showWaterways     = prefs.getBool("showWaterways",    true);
         cfg.airportColor             = { 120, 120, 0 };
         prefs.getBytes("apColor",     &cfg.airportColor,   sizeof(RGBColor));
         cfg.showClimbDescent  = prefs.getBool("showClimbDesc",    true);
@@ -91,6 +93,7 @@ void storageSave(const DeviceConfig &cfg) {
     prefs.putBool("showAltClr",  cfg.showAltColors);
     prefs.putBool("showAirports",    cfg.showAirports);
     prefs.putBool("showAirportNames",cfg.showAirportNames);
+    prefs.putBool("showWaterways",   cfg.showWaterways);
     prefs.putBytes("apColor",        &cfg.airportColor,   sizeof(RGBColor));
     prefs.putBool("showClimbDesc",   cfg.showClimbDescent);
     prefs.putBool("showFlightNum",   cfg.showFlightNumber);
