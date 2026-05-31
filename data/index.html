@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RempyRadar Setup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d; color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 16px; padding: 24px 16px 48px; max-width: 520px; margin: 0 auto;
+  }
+  h1 { color: #00dc00; font-size: 1.5rem; text-align: center; margin-bottom: 4px; letter-spacing: 1px; }
+  .subtitle { text-align: center; color: #555; font-size: 0.85rem; margin-bottom: 28px; }
+  section { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  h2 { color: #00dc00; font-size: 0.85rem; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1.5px; }
+  label.field { display: block; font-size: 0.82rem; color: #888; margin-bottom: 4px; margin-top: 14px; }
+  label.field:first-of-type { margin-top: 0; }
+  input[type=text], input[type=password], input[type=number], select {
+    width: 100%; padding: 10px 12px; border-radius: 6px;
+    border: 1px solid #333; background: #111; color: #e0e0e0;
+    font-size: 1rem; outline: none; -webkit-appearance: none; appearance: none;
+  }
+  input:focus, select:focus { border-color: #00dc00; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hint { font-size: 0.75rem; color: #555; margin-top: 6px; line-height: 1.4; }
+  /* Password reveal */
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 72px; }
+  .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: #00dc00; cursor: pointer; font-size: 0.8rem; padding: 4px 6px; }
+  /* Tabs */
+  .tabs { display: flex; border-radius: 6px; overflow: hidden; border: 1px solid #333; margin-bottom: 14px; }
+  .tab { flex: 1; padding: 8px 12px; background: #111; border: none; color: #888;
+    cursor: pointer; font-size: 0.9rem; transition: background .15s, color .15s; }
+  .tab.active { background: #00dc00; color: #000; font-weight: 600; }
+  /* Toggle rows */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 0; border-bottom: 1px solid #222; }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 0.95rem; }
+  .toggle-sub { font-size: 0.75rem; color: #555; margin-top: 2px; }
+  .switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: #333; border-radius: 13px; transition: .2s; cursor: pointer; }
+  .slider::before { content: ''; position: absolute; width: 20px; height: 20px;
+    left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  input:checked + .slider { background: #00dc00; }
+  input:checked + .slider::before { transform: translateX(22px); }
+  .sep { border-top: 1px solid #222; margin: 14px 0 4px; }
+  /* Altitude section */
+  #altSection { margin-top: 16px; padding-top: 16px; border-top: 1px solid #222; }
+  .grad-bar { height: 20px; border-radius: 6px; border: 1px solid #333; margin-top: 12px; }
+  .swatch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 12px; }
+  .swatch { border-radius: 5px; overflow: hidden; border: 1px solid #2a2a2a; }
+  .swatch-color { display: block; height: 36px; width: 100%; }
+  .swatch-info { padding: 4px 3px; background: #1f1f1f; text-align: center; }
+  .swatch-alt { display: block; font-size: 0.6rem; color: #666; }
+  .stop-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 12px; }
+  .stop-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .stop-swatch { width: 100%; height: 36px; border-radius: 5px; border: 1px solid #333; cursor: pointer; transition: border-color .15s; }
+  .stop-swatch:hover { border-color: #00dc00; }
+  .stop-alt { font-size: 0.6rem; color: #555; }
+  /* Submit */
+  .btn { display: block; width: 100%; padding: 14px; background: #00dc00; color: #000;
+    border: none; border-radius: 8px; font-size: 1.05rem; font-weight: 700;
+    cursor: pointer; margin-top: 8px; letter-spacing: 0.5px; }
+  .btn:active { background: #00b800; }
+  .btn-ghost { display: block; width: 100%; padding: 10px; background: transparent;
+    color: #555; border: 1px solid #2e2e2e; border-radius: 8px; font-size: 0.88rem;
+    cursor: pointer; margin-top: 14px; }
+  .btn-ghost:active { background: #222; color: #888; }
+  /* Radar colour picker row */
+  .color-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; margin-bottom: 2px; }
+  .color-swatch { width: 44px; height: 34px; border-radius: 5px; border: 1px solid #333;
+    cursor: pointer; flex-shrink: 0; }
+  .color-swatch:hover { border-color: #555; }
+  .color-hex { width: 92px; padding: 7px 10px; border-radius: 6px; border: 1px solid #333;
+    background: #111; color: #e0e0e0; font-family: monospace; font-size: 0.88rem; outline: none; }
+  .color-hex:focus { border-color: #00dc00; }
+  .form-hint { font-size: 0.78rem; color: #444; margin-top: 8px; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>RempyRadar</h1>
+<p class="subtitle">First-time setup</p>
+
+<form action="/save" method="POST">
+
+  <!-- WiFi -->
+  <section>
+    <h2>WiFi</h2>
+    <label class="field" for="ssid">Network name (SSID)</label>
+    <input type="text" id="ssid" name="ssid" autocomplete="off"
+           autocorrect="off" autocapitalize="none" spellcheck="false" required>
+    <label class="field" for="pass">Password</label>
+    <div class="pw-wrap">
+      <input type="password" id="pass" name="pass" autocomplete="off">
+      <button type="button" class="pw-toggle" onclick="togglePw()">Show</button>
+    </div>
+  </section>
+
+  <!-- Location -->
+  <section>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="margin-bottom:0">Location</h2>
+      <button type="button" onclick="confirmReset('Location',resetLocation)" title="Reset to defaults" style="background:none;border:1px solid #2a2a2a;color:#555;cursor:pointer;font-size:1rem;width:28px;height:28px;border-radius:50%;padding:0;line-height:1;transform:rotate(-45deg)">&#8634;</button>
+    </div>
+
+    <input type="hidden" id="locMode" name="locMode" value="coords">
+    <div class="tabs">
+      <button type="button" id="tabCoords" class="tab active" onclick="setLocMode('coords')">Coordinates</button>
+      <button type="button" id="tabAddr"   class="tab"        onclick="setLocMode('address')">Address</button>
+    </div>
+
+    <div id="coordsSection">
+      <div class="row2">
+        <div>
+          <label class="field" for="lat">Latitude</label>
+          <input type="number" id="lat" name="lat" step="any" min="-90" max="90" placeholder="-37.8136" required>
+        </div>
+        <div>
+          <label class="field" for="lon">Longitude</label>
+          <input type="number" id="lon" name="lon" step="any" min="-180" max="180" placeholder="144.9631" required>
+        </div>
+      </div>
+      <p class="hint">Open Google Maps or Apple Maps, long-press your location, and copy the coordinates shown.</p>
+    </div>
+
+    <div id="addressSection" style="display:none">
+      <label class="field" for="address">Street address</label>
+      <input type="text" id="address" name="address"
+             placeholder="e.g. 123 Collins St, Melbourne VIC" autocorrect="off" spellcheck="false">
+      <p class="hint">Coordinates will be resolved the first time the device connects to WiFi.</p>
+    </div>
+
+    <label class="field" for="radius">Radar radius (km)</label>
+    <input type="number" id="radius" name="radius" min="1" max="50" value="25">
+
+    <div class="sep"></div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Show nearby airports</div>
+        <div class="toggle-sub">Automatically found when the device first connects to WiFi</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="airportColorSwatch" style="display:inline-block;width:22px;height:22px;border-radius:50%;border:2px solid #555;cursor:pointer;flex-shrink:0;background:#787800"
+             onclick="document.getElementById('airportColor').click()" title="Pick colour"></div>
+        <label class="switch">
+          <input type="checkbox" id="showAirports" name="showAirports" checked onchange="onAirportsToggle()">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    <input type="color" id="airportColor" name="airportColor" value="#787800"
+           style="position:absolute;left:-9999px" oninput="onAirportPickerInput()">
+    <div id="airportNamesSection" class="toggle-row" style="padding-bottom:0;border-bottom:none;padding-left:16px">
+      <div>
+        <div class="toggle-label">Show airport names</div>
+        <div class="toggle-sub">Display IATA/ICAO code next to each airport dot</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="showAirportNames" name="showAirportNames" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </section>
+
+  <!-- Display -->
+  <section>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="margin-bottom:0">Display</h2>
+      <button type="button" onclick="confirmReset('Display',resetDisplay)" title="Reset to defaults" style="background:none;border:1px solid #2a2a2a;color:#555;cursor:pointer;font-size:1rem;width:28px;height:28px;border-radius:50%;padding:0;line-height:1;transform:rotate(-45deg)">&#8634;</button>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Clock</div>
+        <div class="toggle-sub">NTP-synced time arced in a ring gap</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="showClock" name="showClock" checked onchange="onClockToggle()">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="tzSection" style="padding:10px 0 4px">
+      <label class="field" for="clockPos">Clock position</label>
+      <select id="clockPos" name="clockPos">
+        <option value="0">Bottom left (default)</option>
+        <option value="1">Bottom right</option>
+        <option value="2">Top left</option>
+        <option value="3">Top right</option>
+      </select>
+      <label class="field" for="tz" style="margin-top:14px">Timezone</label>
+      <select id="tz" name="tz">
+        <option value="UTC0">UTC (Coordinated Universal Time)</option>
+        <optgroup label="Europe">
+          <option value="GMT0BST,M3.5.0/1,M10.5.0">London / Dublin (GMT/BST)</option>
+          <option value="CET-1CEST,M3.5.0,M10.5.0/3">Amsterdam / Berlin / Paris / Rome (CET)</option>
+          <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Athens / Helsinki / Kyiv (EET)</option>
+          <option value="MSK-3">Moscow (MSK, UTC+3)</option>
+        </optgroup>
+        <optgroup label="Middle East &amp; Africa">
+          <option value="GST-4">Dubai / Abu Dhabi (GST, UTC+4)</option>
+        </optgroup>
+        <optgroup label="Asia">
+          <option value="IST-5:30">India (IST, UTC+5:30)</option>
+          <option value="ICT-7">Bangkok / Jakarta / Hanoi (ICT, UTC+7)</option>
+          <option value="CST-8">Beijing / Singapore / Hong Kong (UTC+8)</option>
+          <option value="JST-9">Tokyo / Seoul (JST/KST, UTC+9)</option>
+        </optgroup>
+        <optgroup label="Australia &amp; Pacific">
+          <option value="AWST-8">Perth (AWST, UTC+8)</option>
+          <option value="ACST-9:30ACDT,M10.1.0,M4.1.0/3">Adelaide (ACST/ACDT)</option>
+          <option value="AEST-10AEDT,M10.1.0,M4.1.0/3" selected>Sydney / Melbourne (AEST/AEDT)</option>
+          <option value="AEST-10">Brisbane (AEST, no DST)</option>
+          <option value="NZST-12NZDT,M9.5.0,M4.1.0/3">Auckland (NZST/NZDT)</option>
+        </optgroup>
+        <optgroup label="Americas">
+          <option value="NST3:30NDT,M3.2.0,M11.1.0">Newfoundland (NST/NDT)</option>
+          <option value="AST4ADT,M3.2.0,M11.1.0">Atlantic Canada (AST/ADT)</option>
+          <option value="EST5EDT,M3.2.0,M11.1.0">US / Canada Eastern (EST/EDT)</option>
+          <option value="CST6CDT,M3.2.0,M11.1.0">US / Canada Central (CST/CDT)</option>
+          <option value="MST7MDT,M3.2.0,M11.1.0">US / Canada Mountain (MST/MDT)</option>
+          <option value="MST7">Arizona (MST, no DST)</option>
+          <option value="PST8PDT,M3.2.0,M11.1.0">US / Canada Pacific (PST/PDT)</option>
+          <option value="AKST9AKDT,M3.2.0,M11.1.0">Alaska (AKST/AKDT)</option>
+          <option value="HST10">Hawaii (HST, no DST)</option>
+          <option value="BRT3">São Paulo / Brasília (BRT, UTC-3)</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Wind widget</div>
+        <div class="toggle-sub">Speed &amp; direction in the bottom-left ring gap</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="showWind" name="showWind" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Aircraft trails</div>
+        <div class="toggle-sub">Fading path behind each aircraft</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="showTrail" name="showTrail" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Show climb / descent</div>
+        <div class="toggle-sub">Adds a small + or &minus; after the flight number label</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="showClimbDescent" name="showClimbDescent" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Altitude colours</div>
+        <div class="toggle-sub">Colour-code aircraft by altitude</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" name="showAltColors" id="showAltColors" checked onchange="onAltToggle()">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div id="altSection">
+      <label class="field" for="palette">Colour palette</label>
+      <select id="palette" name="palette" onchange="onPaletteChange()">
+        <option value="0">Classic Rainbow (default)</option>
+        <option value="1">Fire</option>
+        <option value="2">Ocean</option>
+        <option value="3">Monochrome</option>
+        <option value="4">Custom</option>
+      </select>
+      <div class="grad-bar" id="gradBar"></div>
+      <div class="swatch-grid" id="presetGrid"></div>
+      <div class="stop-grid"  id="customGrid" style="display:none"></div>
+      <div style="position:absolute;left:-9999px" aria-hidden="true" id="colorInputs"></div>
+    </div>
+  </section>
+
+  <!-- Aircraft Labels -->
+  <section>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="margin-bottom:0">Aircraft Labels</h2>
+      <button type="button" onclick="confirmReset('Aircraft Labels',resetLabels)" title="Reset to defaults" style="background:none;border:1px solid #2a2a2a;color:#555;cursor:pointer;font-size:1rem;width:28px;height:28px;border-radius:50%;padding:0;line-height:1;transform:rotate(-45deg)">&#8634;</button>
+    </div>
+
+    <!-- Flight number -->
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Show flight number</div>
+        <div class="toggle-sub">e.g. JST655 — primary callsign label on each ping</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="FlightNumSwatch" style="display:none;width:22px;height:22px;border-radius:50%;border:2px solid #555;cursor:pointer;flex-shrink:0;background:#00DC00"
+             onclick="document.getElementById('flightNumColor').click()" title="Pick colour"></div>
+        <label class="switch">
+          <input type="checkbox" id="showFlightNumber" name="showFlightNumber" checked onchange="onLabelToggle();syncLabelColor('FlightNum')">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Registration -->
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Show registration</div>
+        <div class="toggle-sub">e.g. VH-XYZ — shown below flight number</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="FlightRegSwatch" style="display:none;width:22px;height:22px;border-radius:50%;border:2px solid #555;cursor:pointer;flex-shrink:0;background:#00DC00"
+             onclick="document.getElementById('flightRegColor').click()" title="Pick colour"></div>
+        <label class="switch">
+          <input type="checkbox" id="showFlightReg" name="showFlightReg" onchange="onLabelToggle();syncLabelColor('FlightReg')">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Aircraft type -->
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Show aircraft type</div>
+        <div class="toggle-sub">e.g. B738 — ICAO type code, shown below registration</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="FlightTypeSwatch" style="display:none;width:22px;height:22px;border-radius:50%;border:2px solid #555;cursor:pointer;flex-shrink:0;background:#00DC00"
+             onclick="document.getElementById('flightTypeColor').click()" title="Pick colour"></div>
+        <label class="switch">
+          <input type="checkbox" id="showFlightType" name="showFlightType" onchange="onLabelToggle();syncLabelColor('FlightType')">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:-9999px" aria-hidden="true">
+      <input type="color" id="flightNumColor"  name="flightNumColor"  value="#00DC00" oninput="onLabelPickerInput('FlightNum')">
+      <input type="color" id="flightRegColor"  name="flightRegColor"  value="#00DC00" oninput="onLabelPickerInput('FlightReg')">
+      <input type="color" id="flightTypeColor" name="flightTypeColor" value="#00DC00" oninput="onLabelPickerInput('FlightType')">
+    </div>
+
+    <div id="labelClutterWarn" style="display:none;background:#2a1800;border:1px solid #cc6600;border-radius:6px;padding:10px 12px;margin-top:8px;font-size:0.78rem;color:#cc8800">
+      &#9888; Enabling more than two label lines at once can cause screen clutter, depending on your radar radius.
+    </div>
+  </section>
+
+  <!-- Radar -->
+  <section>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="margin-bottom:0">Radar</h2>
+      <button type="button" onclick="confirmReset('Radar',resetRadar)" title="Reset to defaults" style="background:none;border:1px solid #2a2a2a;color:#555;cursor:pointer;font-size:1rem;width:28px;height:28px;border-radius:50%;padding:0;line-height:1;transform:rotate(-45deg)">&#8634;</button>
+    </div>
+
+    <!-- North indicator -->
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Show north indicator</div>
+        <div class="toggle-sub">Displays &ldquo;N&rdquo; at the top of the radar</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="showNorth" name="showNorth" checked onchange="onNorthToggle()">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="northColorRow" style="padding:4px 0 8px;border-bottom:1px solid #222">
+      <label class="field" style="margin-top:8px">N colour</label>
+      <div class="color-row">
+        <div class="color-swatch" id="northColorSwatch" style="background:#FF0000"
+             onclick="document.getElementById('northColorNative').click()"></div>
+        <input class="color-hex" id="northColorHex" type="text" maxlength="7" value="#FF0000"
+               oninput="onRadarHexInput('north')" onchange="onRadarHexChange('north')">
+        <input type="color" id="northColorNative" name="northColor" value="#FF0000"
+               style="position:absolute;left:-9999px" oninput="onRadarPickerInput('north')">
+      </div>
+    </div>
+
+    <!-- Ring colour -->
+    <label class="field">Ring &amp; grid colour</label>
+    <div class="color-row" style="margin-bottom:8px">
+      <div class="color-swatch" id="ringColorSwatch" style="background:#003C00"
+           onclick="document.getElementById('ringColorNative').click()"></div>
+      <input class="color-hex" id="ringColorHex" type="text" maxlength="7" value="#003C00"
+             oninput="onRadarHexInput('ring')" onchange="onRadarHexChange('ring')">
+      <input type="color" id="ringColorNative" name="ringColor" value="#003C00"
+             style="position:absolute;left:-9999px" oninput="onRadarPickerInput('ring')">
+    </div>
+
+    <!-- Sweep colour -->
+    <label class="field">Sweep colour</label>
+    <div class="color-row">
+      <div class="color-swatch" id="sweepColorSwatch" style="background:#00FF00"
+           onclick="document.getElementById('sweepColorNative').click()"></div>
+      <input class="color-hex" id="sweepColorHex" type="text" maxlength="7" value="#00FF00"
+             oninput="onRadarHexInput('sweep')" onchange="onRadarHexChange('sweep')">
+      <input type="color" id="sweepColorNative" name="sweepColor" value="#00FF00"
+             style="position:absolute;left:-9999px" oninput="onRadarPickerInput('sweep')">
+    </div>
+
+  </section>
+
+  <button type="submit" class="btn">Save &amp; Start Radar</button>
+  <p class="form-hint">The device will reboot and connect to your WiFi network.</p>
+
+</form>
+
+<script>
+var TIERS = ['0 ft','1K ft','2K ft','4K ft','6K ft','8K ft','10K ft','20K ft','30K ft','40K ft'];
+var PRESETS = [
+  ['#C85000','#E68200','#F0AA00','#F0DC00','#C8E600','#64DC00','#00DC00','#00B48C','#0032C8','#9600C8'],
+  ['#000033','#110000','#330000','#990000','#CC3300','#FF6600','#FF9900','#FFCC00','#FFFF66','#FFFFFF'],
+  ['#003366','#004488','#0055AA','#0077CC','#0099DD','#00AAEE','#00BBFF','#66DDFF','#AAEEFF','#CCFFFF'],
+  ['#003300','#005500','#007700','#009900','#00BB00','#00CC00','#00DD00','#44EE00','#88FF44','#CCFFAA']
+];
+
+var isSettingsMode = false;  // true after populateForm runs; relaxes address required
+
+// Location tab toggle
+function setLocMode(mode) {
+  var isCoords = mode === 'coords';
+  document.getElementById('coordsSection').style.display  = isCoords ? '' : 'none';
+  document.getElementById('addressSection').style.display = isCoords ? 'none' : '';
+  document.getElementById('tabCoords').className = 'tab' + (isCoords ? ' active' : '');
+  document.getElementById('tabAddr').className   = 'tab' + (isCoords ? '' : ' active');
+  document.getElementById('lat').required     = isCoords && !isSettingsMode;
+  document.getElementById('lon').required     = isCoords && !isSettingsMode;
+  // In settings mode blank address means "keep existing" — not an error
+  document.getElementById('address').required = !isCoords && !isSettingsMode;
+  document.getElementById('locMode').value    = mode;
+}
+
+// Hidden colour inputs
+var ciWrap = document.getElementById('colorInputs');
+for (var i = 0; i < 10; i++) {
+  var inp = document.createElement('input');
+  inp.type = 'color'; inp.name = 'altColor' + i; inp.id = 'ci' + i;
+  inp.value = PRESETS[0][i];
+  inp.addEventListener('input', (function(idx){ return function(){ onPickerChange(idx); }; })(i));
+  ciWrap.appendChild(inp);
+}
+
+function getColor(i) { return document.getElementById('ci' + i).value; }
+function setColor(i, v) { document.getElementById('ci' + i).value = v; }
+function allColors() { var c=[]; for(var i=0;i<10;i++) c.push(getColor(i)); return c; }
+
+function updateGradient() {
+  var stops = [];
+  for (var i = 0; i < 10; i++) stops.push(getColor(i) + ' ' + (i/9*100).toFixed(0) + '%');
+  document.getElementById('gradBar').style.background = 'linear-gradient(to right,' + stops.join(',') + ')';
+}
+
+function buildPresetGrid(colors) {
+  var g = document.getElementById('presetGrid'); g.innerHTML = '';
+  for (var i = 0; i < 10; i++) {
+    var sw = document.createElement('div'); sw.className = 'swatch';
+    sw.innerHTML = '<span class="swatch-color" style="background:' + colors[i] + '"></span>' +
+      '<div class="swatch-info"><span class="swatch-alt">' + TIERS[i] + '</span></div>';
+    g.appendChild(sw);
+  }
+}
+
+function buildCustomGrid() {
+  var g = document.getElementById('customGrid'); g.innerHTML = '';
+  for (var i = 0; i < 10; i++) {
+    var col = getColor(i);
+    var item = document.createElement('div'); item.className = 'stop-item';
+    item.innerHTML =
+      '<div class="stop-swatch" id="ss'+i+'" style="background:'+col+'"' +
+        ' onclick="document.getElementById(\'ci'+i+'\').click()"></div>' +
+      '<span class="stop-alt">'+TIERS[i]+'</span>';
+    g.appendChild(item);
+  }
+}
+
+function onPickerChange(i) {
+  var v = getColor(i);
+  var ss = document.getElementById('ss'+i);
+  if (ss) ss.style.background = v;
+  updateGradient();
+}
+
+function onPaletteChange() {
+  var p = parseInt(document.getElementById('palette').value), isCustom = p===4;
+  if (!isCustom) { for(var i=0;i<10;i++) setColor(i,PRESETS[p][i]); }
+  updateGradient();
+  if (isCustom) {
+    buildCustomGrid();
+    document.getElementById('presetGrid').style.display = 'none';
+    document.getElementById('customGrid').style.display = 'grid';
+  } else {
+    buildPresetGrid(allColors());
+    document.getElementById('presetGrid').style.display = 'grid';
+    document.getElementById('customGrid').style.display = 'none';
+  }
+}
+
+function onClockToggle() {
+  document.getElementById('tzSection').style.display =
+    document.getElementById('showClock').checked ? 'block' : 'none';
+}
+
+function onAltToggle() {
+  document.getElementById('altSection').style.display =
+    document.getElementById('showAltColors').checked ? 'block' : 'none';
+}
+
+function onAirportsToggle() {
+  var on = document.getElementById('showAirports').checked;
+  document.getElementById('airportNamesSection').style.display  = on ? 'flex'         : 'none';
+  document.getElementById('airportColorSwatch').style.display   = on ? 'inline-block' : 'none';
+}
+
+function onAirportPickerInput() {
+  document.getElementById('airportColorSwatch').style.background =
+    document.getElementById('airportColor').value;
+}
+
+function setAirportColor(hex) {
+  document.getElementById('airportColor').value = hex;
+  document.getElementById('airportColorSwatch').style.background = hex;
+}
+
+function resetLocation() {
+  document.getElementById('showAirports').checked     = true;
+  document.getElementById('showAirportNames').checked = true;
+  setAirportColor('#787800');
+  onAirportsToggle();
+}
+
+function onLabelToggle() {
+  var count = ['showFlightNumber','showFlightReg','showFlightType']
+    .filter(function(id) { return document.getElementById(id).checked; }).length;
+  document.getElementById('labelClutterWarn').style.display = count >= 3 ? 'block' : 'none';
+}
+
+var LABEL_SHOW_ID = { FlightNum: 'showFlightNumber', FlightReg: 'showFlightReg', FlightType: 'showFlightType' };
+
+function syncLabelColor(key) {
+  var on = document.getElementById(LABEL_SHOW_ID[key]).checked;
+  document.getElementById(key + 'Swatch').style.display = on ? 'inline-block' : 'none';
+}
+
+function confirmReset(name, fn) {
+  if (confirm('Reset ' + name + ' to defaults?')) fn();
+}
+
+function resetDisplay() {
+  document.getElementById('showClock').checked        = true;
+  document.getElementById('showWind').checked         = true;
+  document.getElementById('showTrail').checked        = true;
+  document.getElementById('showAltColors').checked    = true;
+  document.getElementById('showClimbDescent').checked = true;
+  document.getElementById('clockPos').value           = '0';
+  document.getElementById('palette').value            = '0';
+  for (var i = 0; i < 10; i++) setColor(i, PRESETS[0][i]);
+  onClockToggle(); onAltToggle(); onPaletteChange();
+}
+
+function resetLabels() {
+  document.getElementById('showFlightNumber').checked = true;
+  document.getElementById('showFlightReg').checked    = false;
+  document.getElementById('showFlightType').checked   = false;
+  setLabelColor('FlightNum',  '#00DC00');
+  setLabelColor('FlightReg',  '#00DC00');
+  setLabelColor('FlightType', '#00DC00');
+  onLabelToggle();
+  syncLabelColor('FlightNum'); syncLabelColor('FlightReg'); syncLabelColor('FlightType');
+}
+
+function resetRadar() {
+  document.getElementById('showNorth').checked = true;
+  setRadarColor('north', RADAR_DEFAULTS.north);
+  setRadarColor('ring',  RADAR_DEFAULTS.ring);
+  setRadarColor('sweep', RADAR_DEFAULTS.sweep);
+  onNorthToggle();
+}
+
+function onLabelPickerInput(key) {
+  var nativeId = { FlightNum: 'flightNumColor', FlightReg: 'flightRegColor', FlightType: 'flightTypeColor' }[key];
+  document.getElementById(key + 'Swatch').style.background = document.getElementById(nativeId).value;
+}
+
+function setLabelColor(key, hex) {
+  var nativeId = { FlightNum: 'flightNumColor', FlightReg: 'flightRegColor', FlightType: 'flightTypeColor' }[key];
+  document.getElementById(nativeId).value = hex;
+  document.getElementById(key + 'Swatch').style.background = hex;
+}
+
+// Radar colour pickers — id is 'north' | 'ring' | 'sweep'
+function setRadarColor(id, hex) {
+  document.getElementById(id + 'ColorNative').value = hex;
+  document.getElementById(id + 'ColorSwatch').style.background = hex;
+  document.getElementById(id + 'ColorHex').value = hex.toUpperCase();
+}
+function onRadarPickerInput(id) {
+  var v = document.getElementById(id + 'ColorNative').value;
+  document.getElementById(id + 'ColorSwatch').style.background = v;
+  document.getElementById(id + 'ColorHex').value = v.toUpperCase();
+}
+function onRadarHexInput(id) {
+  var v = document.getElementById(id + 'ColorHex').value.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+    document.getElementById(id + 'ColorNative').value = v;
+    document.getElementById(id + 'ColorSwatch').style.background = v;
+  }
+}
+function onRadarHexChange(id) {
+  var v = document.getElementById(id + 'ColorHex').value.trim();
+  if (!/^#[0-9A-Fa-f]{6}$/.test(v))
+    document.getElementById(id + 'ColorHex').value =
+      document.getElementById(id + 'ColorNative').value.toUpperCase();
+}
+function onNorthToggle() {
+  document.getElementById('northColorRow').style.display =
+    document.getElementById('showNorth').checked ? 'block' : 'none';
+}
+var RADAR_DEFAULTS = { north: '#FF0000', ring: '#003C00', sweep: '#00FF00' };
+
+function togglePw() {
+  var f = document.getElementById('pass'), b = f.nextElementSibling;
+  if (f.type === 'password') { f.type = 'text'; b.textContent = 'Hide'; }
+  else { f.type = 'password'; b.textContent = 'Show'; }
+}
+
+updateGradient();
+buildPresetGrid(allColors());
+onAirportsToggle();
+syncLabelColor('FlightNum');
+syncLabelColor('FlightReg');
+syncLabelColor('FlightType');
+onNorthToggle();
+
+function populateForm(c) {
+  isSettingsMode = true;  // relax address required for the rest of this session
+
+  // WiFi
+  if (c.ssid) document.getElementById('ssid').value = c.ssid;
+  if (c.pass) document.getElementById('pass').value = c.pass;
+
+  // Location — show coords if resolved; address tab if only an address is stored
+  if (c.lat != 0 || c.lon != 0) {
+    setLocMode('coords');
+    document.getElementById('lat').value       = '';
+    document.getElementById('lat').placeholder = 'unchanged';
+    document.getElementById('lon').value       = '';
+    document.getElementById('lon').placeholder = 'unchanged';
+  } else if (c.hasAddress) {
+    setLocMode('address');
+    // Leave value blank for privacy; placeholder tells the user it's saved
+    document.getElementById('address').value       = '';
+    document.getElementById('address').placeholder = 'unchanged';
+  }
+  if (c.radius) document.getElementById('radius').value = c.radius;
+
+  // Toggles
+  document.getElementById('showClock').checked     = !!c.showClock;
+  document.getElementById('showWind').checked      = !!c.showWind;
+  document.getElementById('showTrail').checked     = !!c.showTrail;
+  document.getElementById('showAltColors').checked = !!c.showAltColors;
+  document.getElementById('showAirports').checked      = !!c.showAirports;
+  document.getElementById('showAirportNames').checked  = !!c.showAirportNames;
+  if (c.airportColor) setAirportColor(c.airportColor);
+  document.getElementById('showClimbDescent').checked  = !!c.showClimbDescent;
+  document.getElementById('showFlightNumber').checked  = !!c.showFlightNumber;
+  document.getElementById('showFlightReg').checked     = !!c.showFlightReg;
+  document.getElementById('showFlightType').checked              = !!c.showFlightType;
+  if (c.flightNumColor)  setLabelColor('FlightNum',  c.flightNumColor);
+  if (c.flightRegColor)  setLabelColor('FlightReg',  c.flightRegColor);
+  if (c.flightTypeColor) setLabelColor('FlightType', c.flightTypeColor);
+  onClockToggle();
+  onAltToggle();
+  onAirportsToggle();
+  onLabelToggle();
+  // sync airport colour toggle call already done via onAirportsToggle above
+  document.getElementById('showNorth').checked = (c.showNorth !== undefined) ? !!c.showNorth : true;
+  if (c.northColor) setRadarColor('north', c.northColor);
+  if (c.ringColor)  setRadarColor('ring',  c.ringColor);
+  if (c.sweepColor) setRadarColor('sweep', c.sweepColor);
+  onNorthToggle();
+  syncLabelColor('FlightNum');
+  syncLabelColor('FlightReg');
+  syncLabelColor('FlightType');
+
+  // Clock position
+  if (c.clockPos !== undefined)
+    document.getElementById('clockPos').value = c.clockPos;
+
+  // Timezone
+  if (c.timezone) {
+    var sel = document.getElementById('tz');
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === c.timezone) { sel.selectedIndex = i; break; }
+    }
+  }
+
+  // Palette and colours
+  var p = c.altPalette || 0;
+  document.getElementById('palette').value = p;
+  if (p === 4 && c.customColors) {
+    for (var i = 0; i < 10 && i < c.customColors.length; i++) setColor(i, c.customColors[i]);
+  } else if (p < 4) {
+    for (var i = 0; i < 10; i++) setColor(i, PRESETS[p][i]);
+  }
+  onPaletteChange();
+}
+
+// Pre-populate when loaded from device (silently skip if opened as a local file)
+fetch('/config').then(function(r) { return r.ok ? r.json() : null; })
+  .then(function(c) { if (c) populateForm(c); })
+  .catch(function() {});
+</script>
+</body>
+</html>

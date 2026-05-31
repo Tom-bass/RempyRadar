@@ -1,0 +1,12 @@
+# PlatformIO build artefacts
+.pio/
+
+# IDE / editor
+.vscode/
+.claude/
+
+# Personal notes
+Ideas.txt
+
+# macOS
+.DS_Store
