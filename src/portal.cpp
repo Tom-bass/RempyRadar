@@ -113,7 +113,6 @@ static void handleSave() {
     cfg.showAltColors  = g_server.hasArg("showAltColors");
     cfg.showAirports      = g_server.hasArg("showAirports");
     cfg.showAirportNames  = g_server.hasArg("showAirportNames");
-    cfg.showWaterways     = g_server.hasArg("showWaterways");
     cfg.showClimbDescent  = g_server.hasArg("showClimbDescent");
     cfg.showFlightNumber  = g_server.hasArg("showFlightNumber");
     cfg.showFlightReg          = g_server.hasArg("showFlightReg");
@@ -236,7 +235,6 @@ static void handleConfig() {
     doc["showAltColors"] = cfg.showAltColors;
     doc["showAirports"]      = cfg.showAirports;
     doc["showAirportNames"]  = cfg.showAirportNames;
-    doc["showWaterways"]     = cfg.showWaterways;
     doc["showClimbDescent"]  = cfg.showClimbDescent;
     doc["showFlightNumber"]  = cfg.showFlightNumber;
     doc["showFlightReg"]        = cfg.showFlightReg;

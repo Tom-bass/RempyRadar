@@ -37,7 +37,3 @@ constexpr int WIND_FETCH_EVERY_N_FETCHES = 30;  // ~10 min at 20s intervals
 #define FIRMWARE_VERSION "dev"
 #endif
 
-// --- Optional features (comment out to disable) ---
-#define FEATURE_WATERWAYS
-constexpr int MAX_WATER_POLYS    = 20;
-constexpr int MAX_WATER_PTS_POLY = 40;

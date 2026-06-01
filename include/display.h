@@ -26,10 +26,6 @@ void displayUpdateWind(const WindData &wind);
 // Show a retro status popup over the radar. durationMs=0 keeps it until replaced.
 void displaySetOtaStatus(const char *msg, unsigned long durationMs = 0);
 
-#ifdef FEATURE_WATERWAYS
-// Store waterway polylines for rendering. Called once after fetch.
-void displaySetWaterways(const WaterPolyline *polys, int count);
-#endif
 
 // Render a complete frame and push it to the display.
 void displayRenderFrame(Adafruit_GC9A01A &tft,

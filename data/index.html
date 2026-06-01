@@ -167,16 +167,6 @@
         <span class="slider"></span>
       </label>
     </div>
-    <div class="toggle-row" style="border-bottom:none;padding-bottom:0">
-      <div>
-        <div class="toggle-label">Show waterways</div>
-        <div class="toggle-sub">Rivers and coastlines overlaid on the radar</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" id="showWaterways" name="showWaterways" checked>
-        <span class="slider"></span>
-      </label>
-    </div>
   </section>
 
   <!-- Display -->
@@ -562,7 +552,6 @@ function setAirportColor(hex) {
 function resetLocation() {
   document.getElementById('showAirports').checked     = true;
   document.getElementById('showAirportNames').checked = true;
-  document.getElementById('showWaterways').checked    = true;
   setAirportColor('#787800');
   onAirportsToggle();
 }
@@ -701,7 +690,6 @@ function populateForm(c) {
   document.getElementById('showAltColors').checked = !!c.showAltColors;
   document.getElementById('showAirports').checked      = !!c.showAirports;
   document.getElementById('showAirportNames').checked  = !!c.showAirportNames;
-  document.getElementById('showWaterways').checked     = (c.showWaterways !== false);
   if (c.airportColor) setAirportColor(c.airportColor);
   document.getElementById('showClimbDescent').checked  = !!c.showClimbDescent;
   document.getElementById('showFlightNumber').checked  = !!c.showFlightNumber;

@@ -29,13 +29,6 @@ struct Plane {
     bool  isEmergency;  // squawking 7500 / 7600 / 7700
 };
 
-#ifdef FEATURE_WATERWAYS
-struct WaterPolyline {
-    float lats[MAX_WATER_PTS_POLY];
-    float lons[MAX_WATER_PTS_POLY];
-    int   count;
-};
-#endif
 
 float toRad(float deg);
 float distanceKm(float lat1, float lon1, float lat2, float lon2);

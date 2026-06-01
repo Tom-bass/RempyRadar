@@ -34,7 +34,7 @@ partitions.csv  Custom 8MB OTA partition layout (two 3MB app slots + ~2MB Little
 |--------|---------------|
 | `main.cpp` | `setup()` / `loop()` — minimal wiring |
 | `radar.cpp` | Geometry: distance, bearing, screen projection |
-| `display.cpp` | Canvas, sweep, pings, landmarks, waterways, grid, clock, wind widget, OTA popup |
+| `display.cpp` | Canvas, sweep, pings, landmarks, grid, clock, wind widget, OTA popup |
 | `fetch.cpp` | WiFi, TLS, HTTP, JSON parsing, FreeRTOS tasks, all data fetches |
 | `storage.cpp` | NVS read/write via `Preferences` |
 | `portal.cpp` | Captive portal (initial setup) + settings web server (post-setup) |
@@ -51,7 +51,7 @@ partitions.csv  Custom 8MB OTA partition layout (two 3MB app slots + ~2MB Little
 - `StaticJsonDocument<16384> g_json` is a module-level global in `fetch.cpp` — never make it local or dynamic
 - `WiFiClientSecure g_client` is a module-level global — same reason
 - Internal RAM at runtime: ~134–151KB free; TLS handshake consumes ~40KB
-- Large temporary buffers (airport body 128KB, waterway doc 128KB) use `malloc` → PSRAM automatically
+- Large temporary buffers (airport body 128KB) use `malloc` → PSRAM automatically
 - 24hr scheduled reboot (`esp_restart()`) mitigates long-term heap fragmentation
 
 ## FreeRTOS architecture
@@ -77,7 +77,7 @@ partitions.csv  Custom 8MB OTA partition layout (two 3MB app slots + ~2MB Little
 ## HTTP helper — `httpGet()` in fetch.cpp
 Used for aircraft, wind, and geocoding fetches. Accumulates the full HTTP response in a `String`,
 strips headers, strips chunked prefix by scanning for first `{`. Suitable only for responses that
-fit comfortably in a String (~10–20KB). Not used for airports or waterways.
+fit comfortably in a String (~10–20KB). Not used for airports.
 
 ## Display geometry (important constants)
 - Canvas: 240×240, `GFXcanvas16`, allocated on PSRAM
@@ -86,7 +86,7 @@ fit comfortably in a String (~10–20KB). Not used for airports or waterways.
 - Angle convention: 0°=north/up, clockwise positive
 - Position formula: `x = cx + r*sin(θ)`, `y = cy - r*cos(θ)`
 - Draw order in `displayRenderFrame()`: fillScreen → sweep trail → sweep line → radar grid (includes
-  waterways + airport landmarks) → expire pings → check sweep hits → fade pings → trails →
+  airport landmarks) → expire pings → check sweep hits → fade pings → trails →
   ping icons → ping labels → clock → wind widget → drawRGBBitmap
 
 ## Clock widget (`drawClock()` in display.cpp)
@@ -154,22 +154,6 @@ for (int i = 0; i < len; i++) {
 - **Node vs way/relation:** nodes have `lat`/`lon` directly; ways/relations have `center.lat`/`center.lon`.
   Both cases handled in parsing. Filter must include both or way/relation airports are silently skipped.
 
-## Waterway fetch (`fetchWaterways()` in fetch.cpp, `#ifdef FEATURE_WATERWAYS`)
-- **Query:** `(way["waterway"="river"](bbox); way["natural"="coastline"](bbox);); out geom(bbox) qt 20;`
-  `out geom(bbox)` clips geometry to the radar bbox — without this a coastal way can have thousands
-  of nodes far outside the viewing area. `[maxsize:500000]` caps response to prevent server-side timeouts.
-- **Flow:** direct TLS connect → HTTP/1.0 GET → skip headers → streaming byte-by-byte parser.
-  No large buffer. Reads directly from `g_client` using lambdas (`rb`, `scan`, `scanLatOrEnd`, `readFloat`).
-- **Chunked decoding:** detected by peeking first body byte. If not `{`, `isChunked=true` and the `rb`
-  lambda handles chunk-size lines transparently.
-- **Geometry parsing:** scans for `"geometry":` (then skips whitespace to `[`) rather than `"geometry":[`
-  — Overpass uses pretty-printed JSON with a space after `:`.
-- **`readFloat`** skips leading whitespace before the numeric value for the same reason.
-- **Adaptive decimation:** when a way has more than `MAX_WATER_PTS_POLY` (40) nodes, the stored points
-  are thinned in-place (keep every other) and `step` doubles. Runs until all points are read.
-- **Not cached** — re-fetched every boot. `g_waterwaysFetched` flag + `g_waterwayRetries` (max 5) control retries.
-- **Drawing:** `drawWaterways()` in display.cpp, called from `drawRadarGrid()`. Linear projection
-  (accurate enough within 50km). Color: `color565(0, 55, 120)` (dark blue).
 
 ## Captive portal (`portalBegin()` in portal.cpp)
 - Runs a blocking `for(;;)` loop — never returns to `main.cpp`'s `loop()`
@@ -193,7 +177,6 @@ for (int i = 0; i < len; i++) {
 - [x] Captive portal (`RempyRadar-Setup` AP → web form → NVS → reboot)
 - [x] Post-setup settings web server (accessible at device IP)
 - [x] Airport landmarks — auto-fetched via Overpass, cached in NVS, IATA labels preferred
-- [x] Waterway overlay — rivers + coastline streamed from Overpass, drawn each boot; runtime toggle in settings
 - [x] OTA firmware updates — nightly 3 am GitHub Releases check + manual "Check for updates" button; on-device status popup; CI publishes `.bin` on version tag push
 
 ## OTA update architecture
@@ -229,6 +212,6 @@ for (int i = 0; i < len; i++) {
 ## Data sources
 - **Aircraft:** `opendata.adsb.fi` — free, no API key. `GET /api/v3/lat/{lat}/lon/{lon}/dist/{nm}`
 - **Wind:** `api.open-meteo.com` — free, no API key. `GET /v1/forecast?latitude=...&longitude=...&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn&forecast_days=1`
-- **Airports + waterways:** `overpass-api.de` (OpenStreetMap Overpass API) — free, no API key
+- **Airports:** `overpass-api.de` (OpenStreetMap Overpass API) — free, no API key
 - **Geocoding:** `nominatim.openstreetmap.org` — free, no API key
 - **OTA update check:** `api.github.com/repos/Tom-bass/RempyRadar/releases/latest` — free, no API key, 60 req/hr unauthenticated (once/day is fine)

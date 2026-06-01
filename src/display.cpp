@@ -64,11 +64,6 @@ static uint16_t     g_flightTypeColor565       = 0x07E0;
 static uint8_t      g_altPalette    = ALT_PALETTE_CLASSIC;
 static RGBColor     g_customAltColors[10];
 
-#ifdef FEATURE_WATERWAYS
-static WaterPolyline g_waterPolys[MAX_WATER_POLYS];
-static int           g_waterPolyCount = 0;
-static bool          g_showWaterways  = true;
-#endif
 
 // OTA status popup — written from core 1, read from core 0.
 // Intentionally unsynchronized: worst case is one frame of garbled text, which is imperceptible.
@@ -139,33 +134,6 @@ static uint16_t scaleColor565(uint16_t col, uint8_t b) {
 // Config application
 // ---------------------------------------------------------------------------
 
-#ifdef FEATURE_WATERWAYS
-void displaySetWaterways(const WaterPolyline *polys, int count) {
-    g_waterPolyCount = count < MAX_WATER_POLYS ? count : MAX_WATER_POLYS;
-    for (int i = 0; i < g_waterPolyCount; i++) g_waterPolys[i] = polys[i];
-}
-
-static void drawWaterways(float homeLat, float homeLon, float radiusKm) {
-    if (g_waterPolyCount == 0) return;
-    // Linear projection — accurate enough within 50km, avoids per-point trig
-    float cosLat = cosf(toRad(homeLat));
-    float scaleX = (RADAR_R / radiusKm) * 111.0f * cosLat;
-    float scaleY = (RADAR_R / radiusKm) * 111.0f;
-    uint16_t col = color565(0, 55, 120);
-    for (int p = 0; p < g_waterPolyCount; p++) {
-        const WaterPolyline &poly = g_waterPolys[p];
-        for (int i = 0; i < poly.count - 1; i++) {
-            int x0 = CENTRE_X + (int)roundf((poly.lons[i]     - homeLon) * scaleX);
-            int y0 = CENTRE_Y - (int)roundf((poly.lats[i]     - homeLat) * scaleY);
-            int x1 = CENTRE_X + (int)roundf((poly.lons[i + 1] - homeLon) * scaleX);
-            int y1 = CENTRE_Y - (int)roundf((poly.lats[i + 1] - homeLat) * scaleY);
-            if ((x0 < -20 && x1 < -20) || (x0 > 260 && x1 > 260) ||
-                (y0 < -20 && y1 < -20) || (y0 > 260 && y1 > 260)) continue;
-            g_canvas->drawLine(x0, y0, x1, y1, col);
-        }
-    }
-}
-#endif
 
 void displaySetAirports(const Airport *airports, int count) {
     g_airportCount = (count > MAX_AIRPORTS) ? MAX_AIRPORTS : count;
@@ -193,9 +161,6 @@ void displayApplyConfig(const DeviceConfig &cfg) {
     g_showAltColors     = cfg.showAltColors;
     g_showAirports      = cfg.showAirports;
     g_showAirportNames  = cfg.showAirportNames;
-#ifdef FEATURE_WATERWAYS
-    g_showWaterways     = cfg.showWaterways;
-#endif
     g_airportColor565   = color565(cfg.airportColor.r, cfg.airportColor.g, cfg.airportColor.b);
     g_showClimbDescent    = cfg.showClimbDescent;
     g_showFlightNumber    = cfg.showFlightNumber;
@@ -312,9 +277,6 @@ static void drawLandmark(float homeLat, float homeLon, float radiusKm,
 }
 
 static void drawRadarGrid(float homeLat, float homeLon, float radiusKm) {
-#ifdef FEATURE_WATERWAYS
-    if (g_showWaterways) drawWaterways(homeLat, homeLon, radiusKm);
-#endif
     g_canvas->drawCircle(CENTRE_X, CENTRE_Y, RADAR_R,          g_ringColor565);
     g_canvas->drawCircle(CENTRE_X, CENTRE_Y, RADAR_R * 2 / 3, g_ringColor565);
     g_canvas->drawCircle(CENTRE_X, CENTRE_Y, RADAR_R * 1 / 3, g_ringColor565);
