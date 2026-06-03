@@ -13,6 +13,10 @@ static DNSServer      g_dns;
 static bool           g_configChanged  = false;
 static bool           g_restartPending = false;
 static unsigned long  g_restartAt      = 0;
+static bool           g_magCalPending   = false;
+static bool           g_setNorthPending = false;
+static bool           g_magCorrPending  = false;
+static float          g_magCorrValue    = 0.0f;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -204,6 +208,22 @@ static void handleOtaCheck() {
     g_server.send(200, "text/plain", "ok");
 }
 
+static void handleMagCal() {
+    g_magCalPending = true;
+    g_server.send(200, "text/plain", "ok");
+}
+
+static void handleSetNorth() {
+    g_setNorthPending = true;
+    g_server.send(200, "text/plain", "ok");
+}
+
+static void handleMagCorrection() {
+    g_magCorrValue   = g_server.arg("deg").toFloat();
+    g_magCorrPending = true;
+    g_server.send(200, "text/plain", "ok");
+}
+
 static void handleConfig() {
     DeviceConfig cfg;
     storageLoad(cfg);
@@ -278,8 +298,11 @@ void portalStartSettingsServer() {
     g_server.on("/",                 handleRoot);
     g_server.on("/index.html",       handleRoot);
     g_server.on("/config",           handleConfig);
-    g_server.on("/save",      HTTP_POST, handleSave);
-    g_server.on("/ota-check", HTTP_POST, handleOtaCheck);
+    g_server.on("/save",        HTTP_POST, handleSave);
+    g_server.on("/ota-check",   HTTP_POST, handleOtaCheck);
+    g_server.on("/mag-calibrate",   HTTP_POST, handleMagCal);
+    g_server.on("/set-north",       HTTP_POST, handleSetNorth);
+    g_server.on("/mag-correction",  HTTP_POST, handleMagCorrection);
     g_server.onNotFound(handleRoot);
     g_server.begin();
     Serial.println("Settings: server started at http://" + WiFi.localIP().toString());
@@ -297,6 +320,25 @@ bool portalConfigChanged() {
 
 bool portalRestartPending() {
     return g_restartPending && millis() >= g_restartAt;
+}
+
+bool portalMagCalPending() {
+    if (!g_magCalPending) return false;
+    g_magCalPending = false;
+    return true;
+}
+
+bool portalSetNorthPending() {
+    if (!g_setNorthPending) return false;
+    g_setNorthPending = false;
+    return true;
+}
+
+bool portalMagCorrectionPending(float &outDeg) {
+    if (!g_magCorrPending) return false;
+    g_magCorrPending = false;
+    outDeg = g_magCorrValue;
+    return true;
 }
 
 void portalBegin() {

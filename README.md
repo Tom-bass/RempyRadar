@@ -1,7 +1,8 @@
 # RempyRadar — Flight Radar Display
 
 A sonar-style flight radar desk toy. Fetches live ADS-B data and renders aircraft as fading pings
-on a rotating radar sweep, with nearby airports, waterways, a live clock and wind widget.
+on a rotating radar sweep, with nearby airports, a live clock, wind widget, and a compass-stabilised
+display that always shows magnetic north correctly.
 
 ---
 
@@ -11,7 +12,7 @@ on a rotating radar sweep, with nearby airports, waterways, a live clock and win
 |-----------|------|
 | MCU | Seeed Studio XIAO ESP32-S3 (8MB OPI PSRAM — required) |
 | Display | Adafruit 1.28" 240×240 Round TFT GC9A01A (EYESPI connector) |
-| IMU | MPU-6050 (wired, initialised, reserved for future tilt-compensated compass) |
+| Magnetometer | Adafruit MMC5603 Triple-axis Magnetometer (STEMMA QT / Qwiic) |
 
 ## Wiring
 
@@ -22,8 +23,11 @@ on a rotating radar sweep, with nearby airports, waterways, a live clock and win
 | TFT RST | D0 |
 | TFT SCK | D8 |
 | TFT MOSI | D10 |
-| MPU-6050 SDA | D4 |
-| MPU-6050 SCL | D5 |
+| MMC5603 SDA | D4 |
+| MMC5603 SCL | D5 |
+
+The MMC5603 uses 3.3V and has a fixed I2C address of `0x30`. With a STEMMA QT cable it's a
+straight 4-wire connection (VIN → 3V3, GND, SDA → D4, SCL → D5).
 
 ---
 
@@ -41,8 +45,7 @@ Both steps are required on a fresh device. The setup web page lives in a separat
 partition — if `uploadfs` is skipped the captive portal serves a 503 error.
 
 **When to re-run `uploadfs`:** only when files in `data/` change (web UI). Firmware-only changes
-just need `upload`. Exception: if the partition table has changed (e.g. first flash after adding
-OTA support), run both — the LittleFS partition moves to a new flash address.
+just need `upload`.
 
 ### OTA partition layout
 
@@ -59,7 +62,7 @@ Do not remove this — without it the sketch crashes after a few fetches.
 ### Dependencies (declared in platformio.ini)
 - Adafruit GC9A01A
 - Adafruit GFX Library
-- Adafruit MPU6050
+- Adafruit MMC56x3
 - Adafruit Unified Sensor
 - ArduinoJson
 
@@ -84,8 +87,34 @@ Settings available via the portal (also reachable at the device IP after setup):
 | Show trails | Fading path behind each aircraft |
 | Altitude colours | Colour-code aircraft by altitude |
 | Show airports | Draw nearby airport markers |
-| Show waterways | Rivers and coastline overlaid on the radar (can be disabled to save boot time) |
 | Altitude palette | Classic Rainbow / Fire / Ocean / Monochrome / Custom |
+
+---
+
+## Compass Calibration
+
+The display is compass-stabilised: the N marker always points to magnetic north and the radar
+rotates to match. This requires a one-time setup.
+
+**Before calibration:** north is locked to the top of the display (safe default).
+
+### Step 1 — Hard-iron calibration (optional but recommended)
+
+Open the device IP in a browser → **Compass** section → tap **Calibrate**.
+Slowly rotate the device flat through a full 360° in 20 seconds.
+This removes the constant magnetic bias from nearby PCB components.
+
+The device also runs **continuous background calibration** automatically — the longer it's used,
+the more accurate it becomes, with no user action needed.
+
+### Step 2 — Set North (required once)
+
+1. Use a phone compass to find north
+2. Point the **USB port of the XIAO toward north**
+3. Open the device IP in a browser → **Compass** section → tap **Set North**
+
+That's it. The reference is saved to NVS and survives every reboot. Point the device at a plane
+in the sky and it will appear at the corresponding position on the radar.
 
 ---
 
@@ -105,19 +134,18 @@ Firmware updates are delivered automatically over WiFi — no USB cable required
 
 ## What It Does
 
-- **Radar sweep** — continuous rotating sweep, north fixed at top
+- **Compass-stabilised radar** — the display rotates so magnetic north is always correctly
+  indicated. Point the device at a plane and it appears at the top of the radar.
+- **Radar sweep** — continuous rotating sweep
 - **Aircraft pings** — aircraft appear as labelled icons when the sweep crosses them; hold full
-  brightness briefly then fade. Colour indicates altitude tier. Climb ↑ / descent ↓ indicators.
+  brightness briefly then fade. Colour indicates altitude tier. Climb / descent indicators.
   Emergency squawk highlights (7500 / 7600 / 7700).
 - **Aircraft trails** — fading path behind each aircraft
 - **Nearby airports** — auto-discovered via OpenStreetMap Overpass on first boot; up to 30 shown,
-  labelled with IATA code where available (MEL, MBW…), falling back to full ICAO otherwise.
-  Cached in NVS and re-fetched automatically if the home location or radius changes.
-- **Waterways** — rivers and coastline sourced from OpenStreetMap and drawn in blue on the radar
-  grid. Re-fetched each boot (not cached).
+  labelled with IATA code where available (MEL, MBW…). Cached in NVS.
 - **Clock** — current local time arced in the SW ring gap, NTP-synced to configured timezone
 - **Wind widget** — wind direction arrow + speed in knots sourced from Open-Meteo, updated every
-  ~10 minutes. Weathervane convention (arrow points toward wind source).
+  ~10 minutes. Weathervane convention (arrow points toward wind source). Rotates with compass.
 - **Double-buffered display** — full frame rendered to a PSRAM canvas each loop, pushed in a
   single `drawRGBBitmap()` call — no flicker
 
@@ -125,12 +153,12 @@ Firmware updates are delivered automatically over WiFi — no USB cable required
 
 ## Architecture
 
-- `loop()` on core 0 — display only, never blocks
+- `loop()` on core 0 — display and magnetometer reads, never blocks
 - `fetchTask` on core 1 — WiFi, TLS, HTTP, JSON parsing every 20 seconds
 - `watchdogTask` on core 1 — silently restarts `fetchTask` if it hangs >120 seconds
 - 24-hour automatic reboot to clear long-term heap fragmentation
 - Plane data and wind data exchanged via mutex-protected staging buffers
-- Airports and waterways fetched once per boot; re-fetched when config changes
+- Airports fetched once per boot; re-fetched when config changes
 
 ### Data sources
 
@@ -138,7 +166,7 @@ Firmware updates are delivered automatically over WiFi — no USB cable required
 |------|--------|---------|
 | Aircraft | `opendata.adsb.fi` | None |
 | Wind | `api.open-meteo.com` | None |
-| Airports + waterways | `overpass-api.de` (OpenStreetMap) | None |
+| Airports | `overpass-api.de` (OpenStreetMap) | None |
 | Geocoding | `nominatim.openstreetmap.org` | None |
 | Time | `pool.ntp.org` NTP | None |
 | OTA update check | `api.github.com` (GitHub Releases) | None |
@@ -154,12 +182,4 @@ Firmware updates are delivered automatically over WiFi — no USB cable required
 - Wind shows nothing until the first successful Open-Meteo fetch
 - Airports appear ~30 seconds after boot (first Overpass fetch); cached airports from a previous
   boot at the same location appear instantly
-- Waterways appear ~30–60 seconds after boot depending on area complexity
-
----
-
-## Planned Features
-
-- **Orientation-aware north** — add a QMC5883L magnetometer (I2C, same D4/D5 bus as MPU-6050).
-  Combine with MPU-6050 accelerometer for tilt compensation. Rotate the radar so north always
-  points to magnetic north regardless of device orientation.
+- Compass north is locked to display top until "Set North" calibration is performed

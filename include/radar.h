@@ -34,4 +34,4 @@ float toRad(float deg);
 float distanceKm(float lat1, float lon1, float lat2, float lon2);
 float bearingTo(float homeLat, float homeLon, float lat2, float lon2);
 void  planeToScreen(float homeLat, float homeLon, float radiusKm,
-                    float lat, float lon, int &px, int &py);
+                    float lat, float lon, int &px, int &py, float northOffset = 0.0f);

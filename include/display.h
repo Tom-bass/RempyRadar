@@ -23,6 +23,9 @@ void displayShowConnected(Adafruit_GC9A01A &tft, const String &ip);
 // Update the cached wind reading shown in the corner widget.
 void displayUpdateWind(const WindData &wind);
 
+// Set device compass heading (degrees, 0-360) so north stays at top of the display.
+void displaySetNorthOffset(float deg);
+
 // Show a retro status popup over the radar. durationMs=0 keeps it until replaced.
 void displaySetOtaStatus(const char *msg, unsigned long durationMs = 0);
 

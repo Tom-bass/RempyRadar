@@ -11,7 +11,7 @@
 
 static const int TRAIL_LEN = 8;
 
-struct TrailPoint { int x, y; bool valid; };
+struct TrailPoint { float geoBearing, distKm; bool valid; };
 
 struct Ping {
     int           x;
@@ -20,7 +20,8 @@ struct Ping {
     char          flight[12];
     char          reg[12];
     char          acType[8];
-    float         bearing;
+    float         bearing;    // geographic bearing from home (degrees)
+    float         distKm;     // distance from home (km)
     uint8_t       brightness;
     bool          active;
     unsigned long holdUntil;
@@ -37,6 +38,7 @@ struct Ping {
 
 static GFXcanvas16 *g_canvas        = nullptr;
 static float        g_sweep         = 0.0f;
+static float        g_northOffset   = 0.0f;  // device compass heading; subtracted from all bearings
 static Ping         g_pings[MAX_PINGS];
 static WindData     g_wind          = { 0.0f, 0, false };
 static Airport      g_airports[MAX_AIRPORTS];
@@ -63,7 +65,6 @@ static uint16_t     g_flightRegColor565        = 0x07E0;
 static uint16_t     g_flightTypeColor565       = 0x07E0;
 static uint8_t      g_altPalette    = ALT_PALETTE_CLASSIC;
 static RGBColor     g_customAltColors[10];
-
 
 // OTA status popup — written from core 1, read from core 0.
 // Intentionally unsynchronized: worst case is one frame of garbled text, which is imperceptible.
@@ -130,6 +131,17 @@ static uint16_t scaleColor565(uint16_t col, uint8_t b) {
     return (r << 11) | (g << 5) | bv;
 }
 
+void displaySetNorthOffset(float deg) {
+    g_northOffset = deg;
+}
+
+static void pingScreenPos(float geoBearing, float distKm, int &px, int &py) {
+    float angle = toRad(geoBearing - g_northOffset - 90.0f);
+    float r = (distKm / g_radiusKm) * RADAR_R;
+    px = CENTRE_X + (int)(r * cosf(angle));
+    py = CENTRE_Y + (int)(r * sinf(angle));
+}
+
 // ---------------------------------------------------------------------------
 // Config application
 // ---------------------------------------------------------------------------
@@ -139,6 +151,7 @@ void displaySetAirports(const Airport *airports, int count) {
     g_airportCount = (count > MAX_AIRPORTS) ? MAX_AIRPORTS : count;
     for (int i = 0; i < g_airportCount; i++) g_airports[i] = airports[i];
 }
+
 
 void displayApplyConfig(const DeviceConfig &cfg) {
     if (cfg.radiusKm != g_radiusKm) {
@@ -264,7 +277,7 @@ void displayShowSetupScreen(Adafruit_GC9A01A &tft) {
 static void drawLandmark(float homeLat, float homeLon, float radiusKm,
                           float lat, float lon, const char *label, uint16_t colour, bool showLabel) {
     int px, py;
-    planeToScreen(homeLat, homeLon, radiusKm, lat, lon, px, py);
+    planeToScreen(homeLat, homeLon, radiusKm, lat, lon, px, py, g_northOffset);
     if (px < 0 || px >= 240 || py < 0 || py >= 240) return;
     g_canvas->drawCircle(px, py, 4, colour);
     g_canvas->fillCircle(px, py, 2, colour);
@@ -287,7 +300,11 @@ static void drawRadarGrid(float homeLat, float homeLon, float radiusKm) {
     if (g_showNorth) {
         g_canvas->setTextColor(g_northColor565);
         g_canvas->setTextSize(1);
-        g_canvas->setCursor(117, CENTRE_Y - RADAR_R + 6);
+        float northScreenBearing = fmodf(360.0f - g_northOffset, 360.0f);
+        float rad = toRad(northScreenBearing);
+        int nx = CENTRE_X + (int)((RADAR_R - 8) * sinf(rad));
+        int ny = CENTRE_Y - (int)((RADAR_R - 8) * cosf(rad));
+        g_canvas->setCursor(nx - 3, ny - 4);
         g_canvas->print("N");
     }
 
@@ -355,20 +372,21 @@ static void drawSweepLine() {
 // Internal drawing — pings
 // ---------------------------------------------------------------------------
 
-static void pushTrailPoint(int slot, int newX, int newY) {
-    if (newX != g_pings[slot].x || newY != g_pings[slot].y) {
-        g_pings[slot].trail[g_pings[slot].trailHead] = { g_pings[slot].x, g_pings[slot].y, true };
+static void pushTrailPoint(int slot, float geoBearing, float distKm) {
+    if (fabsf(geoBearing - g_pings[slot].bearing) > 0.01f ||
+        fabsf(distKm     - g_pings[slot].distKm)  > 0.01f) {
+        g_pings[slot].trail[g_pings[slot].trailHead] = { g_pings[slot].bearing, g_pings[slot].distKm, true };
         g_pings[slot].trailHead = (g_pings[slot].trailHead + 1) % TRAIL_LEN;
     }
 }
 
-static void populatePing(int slot, int px, int py, const char *callsign,
+static void populatePing(int slot, float geoBearing, float distKm, const char *callsign,
                          const char *flight, const char *reg, const char *acType,
-                         float bearing, uint16_t altColor, float track,
+                         uint16_t altColor, float track,
                          const char *category, bool groundLevel, int baroRate,
                          bool isEmergency) {
-    g_pings[slot].x                = px;
-    g_pings[slot].y                = py;
+    g_pings[slot].bearing          = geoBearing;
+    g_pings[slot].distKm           = distKm;
     strncpy(g_pings[slot].callsign, callsign, 11);
     g_pings[slot].callsign[11]     = '\0';
     strncpy(g_pings[slot].flight,   flight,   11);
@@ -377,7 +395,6 @@ static void populatePing(int slot, int px, int py, const char *callsign,
     g_pings[slot].reg[11]          = '\0';
     strncpy(g_pings[slot].acType,   acType,   7);
     g_pings[slot].acType[7]        = '\0';
-    g_pings[slot].bearing          = bearing;
     g_pings[slot].brightness       = 255;
     g_pings[slot].holdUntil        = millis() + 4000;
     g_pings[slot].active           = true;
@@ -391,16 +408,16 @@ static void populatePing(int slot, int px, int py, const char *callsign,
     g_pings[slot].category[3]      = '\0';
 }
 
-static void triggerPing(int px, int py, const char *callsign,
+static void triggerPing(float geoBearing, float distKm, const char *callsign,
                         const char *flight, const char *reg, const char *acType,
-                        float bearing, uint16_t altColor, float track,
+                        uint16_t altColor, float track,
                         const char *category, bool groundLevel, int baroRate,
                         bool isEmergency) {
     // Update existing active ping
     for (int i = 0; i < MAX_PINGS; i++) {
         if (g_pings[i].active && strncmp(g_pings[i].callsign, callsign, 11) == 0) {
-            pushTrailPoint(i, px, py);
-            populatePing(i, px, py, callsign, flight, reg, acType, bearing,
+            pushTrailPoint(i, geoBearing, distKm);
+            populatePing(i, geoBearing, distKm, callsign, flight, reg, acType,
                          altColor, track, category, groundLevel, baroRate, isEmergency);
             return;
         }
@@ -409,8 +426,8 @@ static void triggerPing(int px, int py, const char *callsign,
     // Reactivate a recently-expired ping, inheriting its trail
     for (int i = 0; i < MAX_PINGS; i++) {
         if (!g_pings[i].active && strncmp(g_pings[i].callsign, callsign, 11) == 0) {
-            pushTrailPoint(i, px, py);
-            populatePing(i, px, py, callsign, flight, reg, acType, bearing,
+            pushTrailPoint(i, geoBearing, distKm);
+            populatePing(i, geoBearing, distKm, callsign, flight, reg, acType,
                          altColor, track, category, groundLevel, baroRate, isEmergency);
             return;
         }
@@ -430,7 +447,7 @@ static void triggerPing(int px, int py, const char *callsign,
     if (slot >= 0) {
         g_pings[slot].trailHead = 0;
         for (int t = 0; t < TRAIL_LEN; t++) g_pings[slot].trail[t].valid = false;
-        populatePing(slot, px, py, callsign, flight, reg, acType, bearing,
+        populatePing(slot, geoBearing, distKm, callsign, flight, reg, acType,
                      altColor, track, category, groundLevel, baroRate, isEmergency);
     }
 }
@@ -438,7 +455,8 @@ static void triggerPing(int px, int py, const char *callsign,
 static void expirePings() {
     for (int i = 0; i < MAX_PINGS; i++) {
         if (!g_pings[i].active) continue;
-        float diff = fmodf(g_sweep - g_pings[i].bearing + 360.0f, 360.0f);
+        float screenBearing = fmodf(g_pings[i].bearing - g_northOffset + 360.0f, 360.0f);
+        float diff = fmodf(g_sweep - screenBearing + 360.0f, 360.0f);
         if (diff > 350.0f) g_pings[i].active = false;
     }
 }
@@ -446,15 +464,17 @@ static void expirePings() {
 static void checkSweepHitsPlanes(const Plane *planes, int planeCount,
                                   float homeLat, float homeLon, float radiusKm) {
     for (int i = 0; i < planeCount; i++) {
+        float geoBearing = bearingTo(homeLat, homeLon, planes[i].lat, planes[i].lon);
+        float distKm     = distanceKm(homeLat, homeLon, planes[i].lat, planes[i].lon);
         int px, py;
-        planeToScreen(homeLat, homeLon, radiusKm, planes[i].lat, planes[i].lon, px, py);
+        pingScreenPos(geoBearing, distKm, px, py);
         if (px < 0 || px >= 240 || py < 0 || py >= 240) continue;
-        float bearing = bearingTo(homeLat, homeLon, planes[i].lat, planes[i].lon);
-        float diff    = fmodf(g_sweep - bearing + 360.0f, 360.0f);
+        float screenBearing = fmodf(geoBearing - g_northOffset + 360.0f, 360.0f);
+        float diff          = fmodf(g_sweep - screenBearing + 360.0f, 360.0f);
         if (diff < SWEEP_SPEED * 1.5f) {
-            triggerPing(px, py, planes[i].callsign,
+            triggerPing(geoBearing, distKm, planes[i].callsign,
                         planes[i].flight, planes[i].reg, planes[i].acType,
-                        bearing, altitudeColor(planes[i].altFt),
+                        altitudeColor(planes[i].altFt),
                         planes[i].track, planes[i].category,
                         planes[i].altFt <= 0, planes[i].baroRate,
                         planes[i].isEmergency);
@@ -520,10 +540,9 @@ static void drawPingIcon(int px, int py, const char *cat, float track, uint16_t 
 // Returns true if this screen point should be visible given when the ping was triggered.
 // Points behind triggerSweep (already swept when ping appeared) reveal instantly.
 // Points ahead of triggerSweep reveal progressively as the sweep reaches them.
-static bool trailPointRevealed(int x, int y, float triggerSweep) {
-    float bearing = atan2f((float)(x - CENTRE_X), -(float)(y - CENTRE_Y)) * (180.0f / 3.14159265f);
-    if (bearing < 0.0f) bearing += 360.0f;
-    float toPoint = fmodf(bearing - triggerSweep + 360.0f, 360.0f);
+static bool trailPointRevealed(float geoBearing, float triggerSweep) {
+    float screenBearing = fmodf(geoBearing - g_northOffset + 360.0f, 360.0f);
+    float toPoint = fmodf(screenBearing - triggerSweep + 360.0f, 360.0f);
     if (toPoint >= 180.0f) return true;  // behind trigger — reveal instantly
     return fmodf(g_sweep - triggerSweep + 360.0f, 360.0f) >= toPoint;
 }
@@ -533,13 +552,15 @@ static void drawTrails() {
     for (int i = 0; i < MAX_PINGS; i++) {
         if (!g_pings[i].active) continue;
 
+        int trailIdx[TRAIL_LEN];
         int ptx[TRAIL_LEN], pty[TRAIL_LEN];
         int count = 0;
         for (int t = 0; t < TRAIL_LEN; t++) {
             int idx = (g_pings[i].trailHead - 1 - t + TRAIL_LEN * 2) % TRAIL_LEN;
             if (!g_pings[i].trail[idx].valid) break;
-            ptx[count] = g_pings[i].trail[idx].x;
-            pty[count] = g_pings[i].trail[idx].y;
+            trailIdx[count] = idx;
+            pingScreenPos(g_pings[i].trail[idx].geoBearing, g_pings[i].trail[idx].distKm,
+                          ptx[count], pty[count]);
             count++;
         }
 
@@ -550,14 +571,14 @@ static void drawTrails() {
         // First segment: current ping → newest trail point.
         // If newest point isn't revealed yet, suppress the whole trail.
         float triggerSweep = g_pings[i].lastTriggerSweep;
-        if (!trailPointRevealed(ptx[0], pty[0], triggerSweep)) continue;
+        if (!trailPointRevealed(g_pings[i].trail[trailIdx[0]].geoBearing, triggerSweep)) continue;
         uint16_t col = scaleColor565(g_pings[i].altColor,
                            (uint8_t)((uint16_t)trailBrightness[0] * pingB / 255));
         g_canvas->drawLine(g_pings[i].x, g_pings[i].y, ptx[0], pty[0], col);
 
         // Older segments — stop at the first point the sweep hasn't reached yet.
         for (int t = 0; t < count - 1; t++) {
-            if (!trailPointRevealed(ptx[t + 1], pty[t + 1], triggerSweep)) break;
+            if (!trailPointRevealed(g_pings[i].trail[trailIdx[t + 1]].geoBearing, triggerSweep)) break;
             col = scaleColor565(g_pings[i].altColor,
                       (uint8_t)((uint16_t)trailBrightness[t + 1] * pingB / 255));
             g_canvas->drawLine(ptx[t], pty[t], ptx[t + 1], pty[t + 1], col);
@@ -572,8 +593,11 @@ static void drawPingIcons() {
         uint16_t col = g_pings[i].isEmergency
             ? color565(255, 0, 0)
             : scaleColor565(g_pings[i].altColor, g_pings[i].brightness);
+        float displayTrack = (g_pings[i].track >= 0.0f)
+            ? fmodf(g_pings[i].track - g_northOffset + 360.0f, 360.0f)
+            : g_pings[i].track;
         drawPingIcon(g_pings[i].x, g_pings[i].y, g_pings[i].category,
-                     g_pings[i].track, col);
+                     displayTrack, col);
     }
 }
 
@@ -686,7 +710,7 @@ static void drawWindWidget() {
     uint16_t col = color565(0, 60, 0);  // match clock / range labels
 
     // Arrow and text share centre angle 188° — sits just clockwise of the clock's last char (207°)
-    float arrowDeg = g_wind.dirDeg;
+    float arrowDeg = fmodf(g_wind.dirDeg - g_northOffset + 360.0f, 360.0f);
     float arrowRad = toRad(arrowDeg);
     float sinA = sinf(arrowRad), cosA = cosf(arrowRad);
 
@@ -777,6 +801,12 @@ static void drawOtaPopup() {
 void displayRenderFrame(Adafruit_GC9A01A &tft,
                         const Plane *planes, int planeCount,
                         float homeLat, float homeLon, float radiusKm) {
+    // Reproject all active pings under the current compass heading
+    for (int i = 0; i < MAX_PINGS; i++) {
+        if (g_pings[i].active)
+            pingScreenPos(g_pings[i].bearing, g_pings[i].distKm, g_pings[i].x, g_pings[i].y);
+    }
+
     g_canvas->fillScreen(0x0000);
 
     drawSweepTrail();

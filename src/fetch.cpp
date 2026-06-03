@@ -34,6 +34,7 @@ static int               g_geocodeFailCount = 0;
 static volatile bool     g_geocodeFailed    = false;
 static bool              g_airportsFetched  = false;
 
+
 // Network objects — kept global to avoid heap fragmentation
 static WiFiClientSecure      g_client;
 static StaticJsonDocument<16384> g_json;
@@ -455,7 +456,6 @@ static bool fetchAirports() {
 }
 
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 // Aircraft fetch — connects, parses, and writes to staging buffer
 // ---------------------------------------------------------------------------
 
@@ -647,6 +647,7 @@ static void fetchTask(void *) {
         if (!g_windStaging.valid || g_fetchCount % WIND_FETCH_EVERY_N_FETCHES == 1) {
             fetchWindData();
         }
+
 
         otaCheckIfDue();
 

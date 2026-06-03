@@ -3,12 +3,13 @@
 ## What this project is
 A flight radar desk toy running on a Seeed Studio XIAO ESP32-S3 with a 1.28" round TFT display.
 It fetches live ADS-B data and renders a sonar-style radar with a rotating sweep and aircraft pings.
+The display is compass-stabilised: it rotates so the N marker always points to magnetic north.
 Intended to be distributed to friends and made publicly available on GitHub.
 
 ## Hardware
 - **MCU:** Seeed Studio XIAO ESP32-S3
 - **Display:** Adafruit 1.28" 240x240 Round TFT GC9A01A (EYESPI connector)
-- **IMU:** MPU-6050 (wired and initialised, not yet used in active code)
+- **Magnetometer:** Adafruit MMC5603 Triple-axis Magnetometer — STEMMA QT / Qwiic (I2C, address 0x30, on D4/D5)
 - **PSRAM:** 8MB OPI — critical, must be enabled or the sketch crashes
 
 ## Development environment
@@ -32,8 +33,8 @@ partitions.csv  Custom 8MB OTA partition layout (two 3MB app slots + ~2MB Little
 
 | Module | Responsibility |
 |--------|---------------|
-| `main.cpp` | `setup()` / `loop()` — minimal wiring |
-| `radar.cpp` | Geometry: distance, bearing, screen projection |
+| `main.cpp` | `setup()` / `loop()` — magnetometer read, heading smooth, calibration state machine |
+| `radar.cpp` | Geometry: distance, bearing, screen projection (accepts `northOffset` param) |
 | `display.cpp` | Canvas, sweep, pings, landmarks, grid, clock, wind widget, OTA popup |
 | `fetch.cpp` | WiFi, TLS, HTTP, JSON parsing, FreeRTOS tasks, all data fetches |
 | `storage.cpp` | NVS read/write via `Preferences` |
@@ -55,7 +56,7 @@ partitions.csv  Custom 8MB OTA partition layout (two 3MB app slots + ~2MB Little
 - 24hr scheduled reboot (`esp_restart()`) mitigates long-term heap fragmentation
 
 ## FreeRTOS architecture
-- `loop()` runs on core 0 — handles display only, never blocks
+- `loop()` runs on core 0 — handles display and magnetometer reads, never blocks
 - `fetchTask` runs on core 1 — WiFi, TLS, HTTP, JSON (stack: 65536 bytes)
 - `watchdogTask` runs on core 1 — restarts `fetchTask` silently if it hangs >120s (stack: 4096 bytes)
 - Staging plane data is mutex-protected; `fetchConsumeStagingIfReady()` is the only handoff point
@@ -85,9 +86,49 @@ fit comfortably in a String (~10–20KB). Not used for airports.
 - Three rings: outer r=115, middle r=77 (2/3), inner r=38 (1/3)
 - Angle convention: 0°=north/up, clockwise positive
 - Position formula: `x = cx + r*sin(θ)`, `y = cy - r*cos(θ)`
-- Draw order in `displayRenderFrame()`: fillScreen → sweep trail → sweep line → radar grid (includes
-  airport landmarks) → expire pings → check sweep hits → fade pings → trails →
+- Draw order in `displayRenderFrame()`: reproject pings → fillScreen → sweep trail → sweep line →
+  radar grid (includes airport landmarks) → expire pings → check sweep hits → fade pings → trails →
   ping icons → ping labels → clock → wind widget → drawRGBBitmap
+
+## Compass / north rotation architecture
+- `g_northOffset` in `display.cpp` — the device's current compass heading (degrees). Subtracted
+  from all geographic bearings before projecting to screen. When 0, north is at top (default).
+- `displaySetNorthOffset(float deg)` — called every frame from `main.cpp` with the smoothed heading.
+  If `g_northCalibrated` is false (no Set North done yet), `main.cpp` passes 0.
+- **Ping positions stored in world space:** `Ping` struct holds `bearing` (geographic) and `distKm`.
+  `x, y` are recomputed each frame via `pingScreenPos()` using the current `g_northOffset`.
+- **Trail points** also store `geoBearing` + `distKm` (not screen x/y), recomputed at draw time.
+- **N label** draws at `fmodf(360 - g_northOffset, 360)` — floats around the ring edge as you rotate.
+- **Wind arrow direction** and **aircraft track arrows** both subtract `g_northOffset` so they point
+  in the correct geographic direction on the rotated display.
+- `planeToScreen()` in `radar.cpp` accepts a `northOffset` default param — used for airport landmarks.
+
+## Magnetometer (`main.cpp`)
+- **Sensor:** Adafruit MMC5603, I2C address 0x30, `mag.setDataRate(100)`, read every frame on core 0
+- **Hard-iron calibration:** continuous background — tracks running min/max of raw X/Y readings.
+  Offsets = `(max + min) / 2`. Only applied once observed span > 15 µT on both axes.
+  Persisted to NVS (`magMinX/MaxX/MinY/MaxY`) every 60 s when changed.
+  Accelerated 20-second spin available via web UI "Calibrate" button.
+- **Mounting-angle correction (`g_magCorrection`):** a single degree offset added to raw heading
+  after hard-iron correction. Set once via web UI "Set North" — user points USB port toward north,
+  taps the button. Saves `correction = -rawHeading` so that orientation becomes 0° (north).
+  Persisted as `magCorr` in NVS.
+- **`g_northCalibrated` flag:** loaded from NVS key `magNSet`. False until user completes Set North.
+  While false, `displaySetNorthOffset(0)` — north locked to top of display.
+- **Heading smoothing:** exponential moving average with circular interpolation, alpha = 0.05
+  (~270 ms to reach 50% of a step change at 50 fps).
+- **Heading formula:** `atan2(cy, cx) * RAD_TO_DEG + g_magCorrection` where cx/cy are hard-iron
+  corrected X/Y readings.
+
+## NVS keys for magnetometer calibration
+| Key | Type | Description |
+|-----|------|-------------|
+| `magMinX` | float | Running min of raw X field |
+| `magMaxX` | float | Running max of raw X field |
+| `magMinY` | float | Running min of raw Y field |
+| `magMaxY` | float | Running max of raw Y field |
+| `magCorr` | float | Mounting-angle correction (degrees) |
+| `magNSet` | bool | True once "Set North" has been completed |
 
 ## Clock widget (`drawClock()` in display.cpp)
 - Arced "HH:MM" display in the SW ring gap (outer–middle, r=96)
@@ -104,7 +145,7 @@ fit comfortably in a String (~10–20KB). Not used for airports.
 - Fetch frequency: on first fetch, then every `WIND_FETCH_EVERY_N_FETCHES` (=30) aircraft fetches (~10 min)
 - Widget centred at 192° (SSW), sits just clockwise of the clock arc which ends at ~207°
 - **Arrow:** thin line at r=90, ±6px shaft, ±4px arrowhead. Points toward the wind SOURCE direction
-  (weathervane convention). No compass label shown.
+  (weathervane convention). Arrow direction rotates with compass heading.
 - **Speed text:** arced at r=104, format `"%dkt"`. Spacing: 7° between digits, 4° between 'k' and 't'.
 - Color: `color565(0, 60, 0)` — same dark green as clock
 - Wind staging uses `static StaticJsonDocument<256> windFilter` and `static StaticJsonDocument<512> windJson`
@@ -154,7 +195,6 @@ for (int i = 0; i < len; i++) {
 - **Node vs way/relation:** nodes have `lat`/`lon` directly; ways/relations have `center.lat`/`center.lon`.
   Both cases handled in parsing. Filter must include both or way/relation airports are silently skipped.
 
-
 ## Captive portal (`portalBegin()` in portal.cpp)
 - Runs a blocking `for(;;)` loop — never returns to `main.cpp`'s `loop()`
 - **Must check `g_restartPending` inline inside the loop** — `portalRestartPending()` is only polled
@@ -178,6 +218,9 @@ for (int i = 0; i < len; i++) {
 - [x] Post-setup settings web server (accessible at device IP)
 - [x] Airport landmarks — auto-fetched via Overpass, cached in NVS, IATA labels preferred
 - [x] OTA firmware updates — nightly 3 am GitHub Releases check + manual "Check for updates" button; on-device status popup; CI publishes `.bin` on version tag push
+- [x] **Compass-stabilised display** — MMC5603 magnetometer; display rotates so N always points to
+  magnetic north. Continuous background hard-iron calibration + one-time "Set North" tap via web UI.
+  North locked to top until calibrated.
 
 ## OTA update architecture
 
@@ -202,12 +245,6 @@ for (int i = 0; i < len; i++) {
   creates a GitHub Release with `firmware.bin` attached via `softprops/action-gh-release`.
 - **Web UI:** `/ota-check` POST route calls `otaTriggerCheck()`; `/config` JSON includes
   `firmware` field so the settings page can display the running version.
-
-## Planned / in progress
-
-- [ ] **Orientation-aware north** — Add QMC5883L magnetometer (I2C, same D4/D5 bus). Use QMC5883L
-  heading + MPU-6050 accelerometer for tilt compensation. Rotate radar so north always points to
-  magnetic north.
 
 ## Data sources
 - **Aircraft:** `opendata.adsb.fi` — free, no API key. `GET /api/v3/lat/{lat}/lon/{lon}/dist/{nm}`

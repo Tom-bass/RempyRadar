@@ -24,10 +24,10 @@ float bearingTo(float homeLat, float homeLon, float lat2, float lon2) {
 }
 
 void planeToScreen(float homeLat, float homeLon, float radiusKm,
-                   float lat, float lon, int &px, int &py) {
+                   float lat, float lon, int &px, int &py, float northOffset) {
     float bearing = bearingTo(homeLat, homeLon, lat, lon);
     float dist    = distanceKm(homeLat, homeLon, lat, lon);
-    float angle   = toRad(bearing - 90.0f);
+    float angle   = toRad(bearing - northOffset - 90.0f);
     float r       = (dist / radiusKm) * RADAR_R;
     px = CENTRE_X + (int)(r * cosf(angle));
     py = CENTRE_Y + (int)(r * sinf(angle));

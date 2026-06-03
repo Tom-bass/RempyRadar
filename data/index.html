@@ -433,6 +433,43 @@
        font-size:0.82rem;color:#00dc00;text-align:center;line-height:1.5"></div>
 </section>
 
+<section>
+  <h2>Compass</h2>
+  <div class="toggle-row" style="border-bottom:none;padding-bottom:4px">
+    <div>
+      <div class="toggle-label">Hard-iron calibration</div>
+      <div class="toggle-sub">Hold device flat, tap Calibrate, rotate slowly 360&deg; in 20 s</div>
+    </div>
+    <button type="button" id="calBtn" onclick="triggerCal()"
+            style="padding:9px 16px;background:transparent;border:1px solid #00dc00;
+                   color:#00dc00;border-radius:6px;font-size:0.85rem;font-weight:600;
+                   cursor:pointer;white-space:nowrap;flex-shrink:0;letter-spacing:0.3px">
+      Calibrate
+    </button>
+  </div>
+  <div id="calMsg" style="display:none;margin-top:10px;padding:10px 12px;
+       background:#0d1f0d;border:1px solid #1a3a1a;border-radius:6px;
+       font-size:0.82rem;color:#00dc00;text-align:center;line-height:1.5"></div>
+
+  <div style="margin-top:18px;border-top:1px solid #1e1e1e;padding-top:16px">
+    <div class="toggle-row" style="border-bottom:none;padding-bottom:4px">
+      <div>
+        <div class="toggle-label">Set north reference</div>
+        <div class="toggle-sub">Point the USB port toward north (use a phone compass), then tap Set North. Done once &mdash; survives reboots.</div>
+      </div>
+      <button type="button" id="setNorthBtn" onclick="triggerSetNorth()"
+              style="padding:9px 16px;background:transparent;border:1px solid #00dc00;
+                     color:#00dc00;border-radius:6px;font-size:0.85rem;font-weight:600;
+                     cursor:pointer;white-space:nowrap;flex-shrink:0;letter-spacing:0.3px">
+        Set North
+      </button>
+    </div>
+    <div id="setNorthMsg" style="display:none;margin-top:8px;padding:8px 12px;
+         background:#0d1f0d;border:1px solid #1a3a1a;border-radius:6px;
+         font-size:0.82rem;color:#00dc00;text-align:center"></div>
+  </div>
+</section>
+
 <script>
 var TIERS = ['0 ft','1K ft','2K ft','4K ft','6K ft','8K ft','10K ft','20K ft','30K ft','40K ft'];
 var PRESETS = [
@@ -758,6 +795,61 @@ function triggerOta() {
       btn.disabled = false;
       btn.textContent = 'Check for updates';
       msg.style.display = 'block';
+      msg.style.color = '#cc4400';
+      msg.textContent = 'Could not reach device.';
+    });
+}
+
+function triggerSetNorth() {
+  var btn = document.getElementById('setNorthBtn');
+  var msg = document.getElementById('setNorthMsg');
+  btn.disabled = true;
+  btn.textContent = 'Setting…';
+  fetch('/set-north', { method: 'POST' })
+    .then(function(r) {
+      btn.disabled = false;
+      btn.textContent = 'Set North';
+      msg.style.display = 'block';
+      msg.style.color = r.ok ? '#00dc00' : '#cc4400';
+      msg.textContent = r.ok
+        ? 'North reference saved! N should now point to magnetic north.'
+        : 'Device returned an error. Try again.';
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Set North';
+      msg.style.display = 'block';
+      msg.style.color = '#cc4400';
+      msg.textContent = 'Could not reach device.';
+    });
+}
+
+function triggerCal() {
+  var btn = document.getElementById('calBtn');
+  var msg = document.getElementById('calMsg');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+  msg.style.display = 'block';
+  msg.style.color = '#00dc00';
+  msg.textContent = 'Calibrating — rotate the device slowly through a full 360°. Takes 20 seconds.';
+  fetch('/mag-calibrate', { method: 'POST' })
+    .then(function(r) {
+      if (r.ok) {
+        setTimeout(function() {
+          btn.disabled = false;
+          btn.textContent = 'Calibrate';
+          msg.textContent = 'Done! Offsets saved. Check the display for confirmation.';
+        }, 21000);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Calibrate';
+        msg.style.color = '#cc4400';
+        msg.textContent = 'Device returned an error. Try again.';
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Calibrate';
       msg.style.color = '#cc4400';
       msg.textContent = 'Could not reach device.';
     });

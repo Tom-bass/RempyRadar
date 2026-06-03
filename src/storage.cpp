@@ -119,6 +119,56 @@ void storageErase() {
     prefs.end();
 }
 
+void storageSaveMagCal(float minX, float maxX, float minY, float maxY) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putFloat("magMinX", minX);
+    prefs.putFloat("magMaxX", maxX);
+    prefs.putFloat("magMinY", minY);
+    prefs.putFloat("magMaxY", maxY);
+    prefs.end();
+}
+
+void storageLoadMagCal(float &minX, float &maxX, float &minY, float &maxY) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    minX = prefs.getFloat("magMinX", 0.0f);
+    maxX = prefs.getFloat("magMaxX", 0.0f);
+    minY = prefs.getFloat("magMinY", 0.0f);
+    maxY = prefs.getFloat("magMaxY", 0.0f);
+    prefs.end();
+}
+
+void storageSaveMagCorrection(float deg) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putFloat("magCorr", deg);
+    prefs.end();
+}
+
+float storageLoadMagCorrection() {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    float v = prefs.getFloat("magCorr", 0.0f);
+    prefs.end();
+    return v;
+}
+
+void storageSaveMagNorthSet(bool v) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putBool("magNSet", v);
+    prefs.end();
+}
+
+bool storageLoadMagNorthSet() {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    bool v = prefs.getBool("magNSet", false);
+    prefs.end();
+    return v;
+}
+
 void storageLoadAirports(Airport *airports, int *count, float currentLat, float currentLon) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);

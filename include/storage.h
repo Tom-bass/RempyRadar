@@ -53,6 +53,19 @@ void storageSave(const DeviceConfig &cfg);
 // Wipe all stored config (factory reset).
 void storageErase();
 
+// Magnetometer hard-iron calibration — stores the observed field range so
+// continuous background calibration survives reboots.
+void storageSaveMagCal(float minX, float maxX, float minY, float maxY);
+void storageLoadMagCal(float &minX, float &maxX, float &minY, float &maxY);
+
+// Magnetometer mounting-angle correction (degrees, added to raw heading).
+void  storageSaveMagCorrection(float deg);
+float storageLoadMagCorrection();
+
+// True once the user has performed the "Set North" one-time alignment.
+void storageSaveMagNorthSet(bool v);
+bool storageLoadMagNorthSet();
+
 // Airport cache — auto-fetched, stored separately from user config.
 // storageLoadAirports discards the cache if the stored location differs from
 // currentLat/currentLon by more than 10 km, preventing stale airports showing

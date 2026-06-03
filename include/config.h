@@ -26,7 +26,8 @@ constexpr unsigned long WATCHDOG_TIMEOUT_MS    = 120000UL;
 constexpr int           REBOOT_AFTER_N_FETCHES = 4320;
 
 // --- Wind fetch ---
-constexpr int WIND_FETCH_EVERY_N_FETCHES = 30;  // ~10 min at 20s intervals
+constexpr int WIND_FETCH_EVERY_N_FETCHES    = 30;  // ~10 min at 20s intervals
+
 
 // --- OTA update source ---
 #define OTA_GITHUB_OWNER "Tom-bass"
