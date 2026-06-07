@@ -70,9 +70,9 @@ Do not remove this — without it the sketch crashes after a few fetches.
 
 ## Configuration
 
-On first boot with no saved config the device starts a WiFi access point named `RempyRadar-Setup`.
-Connect to it from any device — the captive portal fires automatically — and fill in the web form.
-Config is saved to NVS and the device reboots into radar mode.
+On first boot with no saved config the device starts a WiFi access point named **`RempyRadar`**.
+Connect to it from any device, open any webpage — the captive portal fires automatically — and fill
+in the web form. Config is saved to NVS and the device reboots into radar mode.
 
 Settings available via the portal (also reachable at the device IP after setup):
 
@@ -88,6 +88,7 @@ Settings available via the portal (also reachable at the device IP after setup):
 | Altitude colours | Colour-code aircraft by altitude |
 | Show airports | Draw nearby airport markers |
 | Altitude palette | Classic Rainbow / Fire / Ocean / Monochrome / Custom |
+| Compass rotation | ⚠ WIP — rotate display so magnetic north always points up (shown only after Set North) |
 
 ---
 
@@ -98,23 +99,31 @@ rotates to match. This requires a one-time setup.
 
 **Before calibration:** north is locked to the top of the display (safe default).
 
-### Step 1 — Hard-iron calibration (optional but recommended)
+> **Note:** Compass rotation is a work-in-progress feature. It works best in open areas away from
+> strong magnetic sources. Enable at your own risk — the radar remains fully functional with it off.
+
+### Step 1 — Hard-iron calibration (required for compass rotation)
 
 Open the device IP in a browser → **Compass** section → tap **Calibrate**.
-Slowly rotate the device flat through a full 360° in 20 seconds.
-This removes the constant magnetic bias from nearby PCB components.
+Slowly rotate the device **flat on a surface** through a full 360° in 20 seconds.
+This removes the constant magnetic bias from the PCB components themselves.
 
-The device also runs **continuous background calibration** automatically — the longer it's used,
-the more accurate it becomes, with no user action needed.
+The calibration is saved to NVS and is stable across reboots. Once established it is frozen —
+environmental anomalies (metal furniture, electronics) will not corrupt it while the device moves
+around. Re-run the spin to recalibrate.
 
 ### Step 2 — Set North (required once)
 
 1. Use a phone compass to find north
-2. Point the **USB port of the XIAO toward north**
+2. Hold the device flat (as it will be used) and point the **USB port of the XIAO toward north**
 3. Open the device IP in a browser → **Compass** section → tap **Set North**
 
-That's it. The reference is saved to NVS and survives every reboot. Point the device at a plane
-in the sky and it will appear at the corresponding position on the radar.
+That's it. The reference is saved to NVS and survives every reboot.
+
+### Step 3 — Enable compass rotation
+
+After Set North is complete, a **Compass rotation** toggle appears in the Compass section.
+Enable it to have the radar rotate so north is always at the top.
 
 ---
 
@@ -134,8 +143,8 @@ Firmware updates are delivered automatically over WiFi — no USB cable required
 
 ## What It Does
 
-- **Compass-stabilised radar** — the display rotates so magnetic north is always correctly
-  indicated. Point the device at a plane and it appears at the top of the radar.
+- **Compass-stabilised radar** ⚠ WIP — the display rotates so magnetic north is always correctly
+  indicated. Requires spin calibration + Set North. Toggle on/off in settings.
 - **Radar sweep** — continuous rotating sweep
 - **Aircraft pings** — aircraft appear as labelled icons when the sweep crosses them; hold full
   brightness briefly then fade. Colour indicates altitude tier. Climb / descent indicators.
@@ -183,3 +192,5 @@ Firmware updates are delivered automatically over WiFi — no USB cable required
 - Airports appear ~30 seconds after boot (first Overpass fetch); cached airports from a previous
   boot at the same location appear instantly
 - Compass north is locked to display top until "Set North" calibration is performed
+- Compass rotation is a WIP feature — it works well in open areas but nearby metal or electronics
+  can affect accuracy. Disable if heading drifts persistently; re-run spin calibration to recalibrate

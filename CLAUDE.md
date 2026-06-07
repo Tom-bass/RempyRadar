@@ -89,6 +89,10 @@ fit comfortably in a String (~10–20KB). Not used for airports.
 - Draw order in `displayRenderFrame()`: reproject pings → fillScreen → sweep trail → sweep line →
   radar grid (includes airport landmarks) → expire pings → check sweep hits → fade pings → trails →
   ping icons → ping labels → clock → wind widget → drawRGBBitmap
+- **Hardware rotation:** `tft.setRotation(3)` in `displayInit()` — 90° CCW, so the device can be
+  mounted on its side (USB port facing a direction of the user's choice)
+- **Blit offset:** `tft.drawRGBBitmap(-3, -3, ...)` — shifts the 240×240 canvas 3px left and 3px
+  up to centre the radar circle within the physical round glass bezel
 
 ## Compass / north rotation architecture
 - `g_northOffset` in `display.cpp` — the device's current compass heading (degrees). Subtracted
@@ -105,28 +109,42 @@ fit comfortably in a String (~10–20KB). Not used for airports.
 
 ## Magnetometer (`main.cpp`)
 - **Sensor:** Adafruit MMC5603, I2C address 0x30, `mag.setDataRate(100)`, read every frame on core 0
-- **Hard-iron calibration:** continuous background — tracks running min/max of raw X/Y readings.
-  Offsets = `(max + min) / 2`. Only applied once observed span > 15 µT on both axes.
-  Persisted to NVS (`magMinX/MaxX/MinY/MaxY`) every 60 s when changed.
-  Accelerated 20-second spin available via web UI "Calibrate" button.
+- **Axis mapping:** The MMC5603 PCB is mounted standing on its long edge. This means the **Z axis**
+  (perpendicular to the PCB face) is horizontal and rotates with the device on the table. **Y is
+  vertical** (useless for compass). Heading uses `atan2(cz, cx)` — not `atan2(cy, cx)`.
+- **Hard-iron calibration:** tracks running min/max of raw X and Z readings. Offsets =
+  `(max + min) / 2`. Only applied once the observed span on both axes exceeds `CAL_MIN_SPAN = 15 µT`.
+  **Calibration is LOCKED once established** — after a successful spin calibration completes, the
+  min/max ranges are frozen. This prevents environmental magnetic anomalies (metal furniture,
+  electronics) from expanding the range and drifting the heading when the device is moved around.
+  Before first calibration (`g_calReady = false`), background updates are still allowed so the
+  device can self-calibrate from normal use.
+- **Spin calibration:** 20-second accelerated pass via web UI "Calibrate" button. Resets the range
+  for a clean run. Includes outlier rejection: during the spin, readings whose field strength deviates
+  more than 2.5× the current estimated radius from centre are discarded. Saves to NVS on completion.
 - **Mounting-angle correction (`g_magCorrection`):** a single degree offset added to raw heading
   after hard-iron correction. Set once via web UI "Set North" — user points USB port toward north,
   taps the button. Saves `correction = -rawHeading` so that orientation becomes 0° (north).
   Persisted as `magCorr` in NVS.
 - **`g_northCalibrated` flag:** loaded from NVS key `magNSet`. False until user completes Set North.
   While false, `displaySetNorthOffset(0)` — north locked to top of display.
+- **`compassRotate` config flag:** even when calibrated, compass rotation can be disabled. Stored in
+  NVS as `compassRotate`. Toggle shown in web UI Compass section only after Set North is done.
+  Marked as WIP (⚠) in the UI — the feature is functional but experimental.
 - **Heading smoothing:** exponential moving average with circular interpolation, alpha = 0.05
   (~270 ms to reach 50% of a step change at 50 fps).
-- **Heading formula:** `atan2(cy, cx) * RAD_TO_DEG + g_magCorrection` where cx/cy are hard-iron
-  corrected X/Y readings.
+- **Heading formula:** `atan2(cz, cx) * RAD_TO_DEG + g_magCorrection` where cx/cz are hard-iron
+  corrected X/Z readings. North offset applied to display only when `g_northCalibrated && config.compassRotate`.
 
 ## NVS keys for magnetometer calibration
 | Key | Type | Description |
 |-----|------|-------------|
 | `magMinX` | float | Running min of raw X field |
 | `magMaxX` | float | Running max of raw X field |
-| `magMinY` | float | Running min of raw Y field |
-| `magMaxY` | float | Running max of raw Y field |
+| `magMinY` | float | Running min of raw Y field (tracked but not used for heading) |
+| `magMaxY` | float | Running max of raw Y field (tracked but not used for heading) |
+| `magMinZ` | float | Running min of raw Z field |
+| `magMaxZ` | float | Running max of raw Z field |
 | `magCorr` | float | Mounting-angle correction (degrees) |
 | `magNSet` | bool | True once "Set North" has been completed |
 
@@ -196,11 +214,18 @@ for (int i = 0; i < len; i++) {
   Both cases handled in parsing. Filter must include both or way/relation airports are silently skipped.
 
 ## Captive portal (`portalBegin()` in portal.cpp)
+- AP name: **`"RempyRadar"`** (was `"RempyRadar-Setup"` in earlier versions)
 - Runs a blocking `for(;;)` loop — never returns to `main.cpp`'s `loop()`
 - **Must check `g_restartPending` inline inside the loop** — `portalRestartPending()` is only polled
   from `main.cpp::loop()` which is unreachable during the captive portal
 - After-setup settings server (`portalStartSettingsServer()`) uses the normal loop flow and
   `portalRestartPending()` / `portalConfigChanged()` correctly
+- **Live endpoints** (outside the main save form, use `fetch()` POST): `/set-north`,
+  `/mag-calibrate`, `/set-compass-rotate`. These update state immediately without a page reload.
+  `portalCompassRotatePending(bool &enabled)` — polled from `main.cpp::loop()` for the toggle.
+- **Geocoding propagation:** `fetchGeocodeReady(float *lat, float *lon)` signals `main.cpp::loop()`
+  when geocoding completes on core 1 so `config.homeLat/Lon` is updated without a restart.
+  Airports are fetched and displayed immediately after geocoding on first boot.
 
 ## What's implemented
 
@@ -214,13 +239,15 @@ for (int i = 0; i < len; i++) {
 - [x] Altitude-based ping colour coding (4 built-in palettes + custom)
 - [x] Climb/descent indicator on pings
 - [x] Emergency squawk highlight (7500/7600/7700)
-- [x] Captive portal (`RempyRadar-Setup` AP → web form → NVS → reboot)
+- [x] Captive portal (`RempyRadar` AP → web form → NVS → reboot)
 - [x] Post-setup settings web server (accessible at device IP)
-- [x] Airport landmarks — auto-fetched via Overpass, cached in NVS, IATA labels preferred
+- [x] Airport landmarks — auto-fetched via Overpass, cached in NVS, IATA labels preferred; display updates immediately after geocoding on first boot
 - [x] OTA firmware updates — nightly 3 am GitHub Releases check + manual "Check for updates" button; on-device status popup; CI publishes `.bin` on version tag push
-- [x] **Compass-stabilised display** — MMC5603 magnetometer; display rotates so N always points to
-  magnetic north. Continuous background hard-iron calibration + one-time "Set North" tap via web UI.
+- [x] **Compass-stabilised display** ⚠ WIP — MMC5603 magnetometer; display rotates so N always points to
+  magnetic north. Locked hard-iron calibration (spin once to establish; frozen thereafter) using X+Z axes
+  (PCB mounted on its side). One-time "Set North" tap via web UI. Compass rotation toggle in web UI.
   North locked to top until calibrated.
+- [x] **Display 90° CCW rotation** — `setRotation(3)` + `drawRGBBitmap(-3,-3,...)` blit offset for centred bezel
 
 ## OTA update architecture
 
