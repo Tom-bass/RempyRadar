@@ -434,7 +434,7 @@
 </section>
 
 <section>
-  <h2>Compass</h2>
+  <h2>Compass <span style="font-size:0.65rem;font-weight:600;color:#cc4400;letter-spacing:0.3px;vertical-align:middle">⚠ WIP — Enable at OWN RISK!!!</span></h2>
   <div class="toggle-row" style="border-bottom:none;padding-bottom:4px">
     <div>
       <div class="toggle-label">Hard-iron calibration</div>
@@ -467,6 +467,19 @@
     <div id="setNorthMsg" style="display:none;margin-top:8px;padding:8px 12px;
          background:#0d1f0d;border:1px solid #1a3a1a;border-radius:6px;
          font-size:0.82rem;color:#00dc00;text-align:center"></div>
+  </div>
+
+  <div id="compassRotateSection" style="margin-top:18px;border-top:1px solid #1e1e1e;padding-top:16px;display:none">
+    <div class="toggle-row" style="border-bottom:none">
+      <div>
+        <div class="toggle-label">Compass rotation</div>
+        <div class="toggle-sub">Radar rotates so magnetic north always points up. Disable for a fixed north-up display.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="compassRotate" onchange="setCompassRotate(this.checked)" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
   </div>
 </section>
 
@@ -740,6 +753,8 @@ function populateForm(c) {
   onAirportsToggle();
   onLabelToggle();
   // sync airport colour toggle call already done via onAirportsToggle above
+  document.getElementById('compassRotateSection').style.display = c.northCalibrated ? '' : 'none';
+  document.getElementById('compassRotate').checked = (c.compassRotate !== undefined) ? !!c.compassRotate : true;
   document.getElementById('showNorth').checked = (c.showNorth !== undefined) ? !!c.showNorth : true;
   if (c.northColor) setRadarColor('north', c.northColor);
   if (c.ringColor)  setRadarColor('ring',  c.ringColor);
@@ -822,6 +837,12 @@ function triggerSetNorth() {
       msg.style.color = '#cc4400';
       msg.textContent = 'Could not reach device.';
     });
+}
+
+function setCompassRotate(enabled) {
+  var body = new URLSearchParams();
+  body.append('enabled', enabled ? '1' : '0');
+  fetch('/set-compass-rotate', { method: 'POST', body: body });
 }
 
 function triggerCal() {

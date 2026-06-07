@@ -33,6 +33,9 @@ static int               g_fetchCount       = 0;
 static int               g_geocodeFailCount = 0;
 static volatile bool     g_geocodeFailed    = false;
 static bool              g_airportsFetched  = false;
+static float             g_geocodedLat      = 0.0f;
+static float             g_geocodedLon      = 0.0f;
+static volatile bool     g_geocodeReady     = false;
 
 
 // Network objects — kept global to avoid heap fragmentation
@@ -251,9 +254,13 @@ static bool fetchGeocode() {
         return false;
     }
 
-    g_cfg.homeLat = atof(doc["lat"].as<const char *>());
-    g_cfg.homeLon = atof(doc["lon"].as<const char *>());
+    g_cfg.homeLat  = atof(doc["lat"].as<const char *>());
+    g_cfg.homeLon  = atof(doc["lon"].as<const char *>());
     storageSave(g_cfg);  // persist resolved coordinates
+
+    g_geocodedLat  = g_cfg.homeLat;
+    g_geocodedLon  = g_cfg.homeLon;
+    g_geocodeReady = true;
 
     Serial.printf("LOG: Geocode: resolved %.4f, %.4f\n", g_cfg.homeLat, g_cfg.homeLon);
     return true;
@@ -710,6 +717,14 @@ bool fetchConsumeStagingIfReady(Plane *dest, int *count) {
 }
 
 bool fetchGeocodeFailed() { return g_geocodeFailed; }
+
+bool fetchGeocodeReady(float *lat, float *lon) {
+    if (!g_geocodeReady) return false;
+    g_geocodeReady = false;
+    *lat = g_geocodedLat;
+    *lon = g_geocodedLon;
+    return true;
+}
 
 void fetchUpdateConfig(const DeviceConfig &cfg) {
     g_cfg.homeLat        = cfg.homeLat;

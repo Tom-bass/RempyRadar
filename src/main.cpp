@@ -22,8 +22,8 @@ static int          planeCountLive = 0;
 
 // Hard-iron calibration: running min/max of raw X/Y field, persisted in NVS.
 // Offsets are recomputed as midpoints whenever the observed range is large enough.
-static float g_calMinX, g_calMaxX, g_calMinY, g_calMaxY;
-static float g_magOffsetX = 0.0f, g_magOffsetY = 0.0f;
+static float g_calMinX, g_calMaxX, g_calMinY, g_calMaxY, g_calMinZ, g_calMaxZ;
+static float g_magOffsetX = 0.0f, g_magOffsetZ = 0.0f;
 static bool  g_calReady   = false;  // true once range is large enough to trust
 
 // Mounting-angle correction: the single offset that maps sensor axes to display north.
@@ -64,18 +64,18 @@ void setup() {
     }
 
     // Load persisted calibration range
-    storageLoadMagCal(g_calMinX, g_calMaxX, g_calMinY, g_calMaxY);
-    float sx = g_calMaxX - g_calMinX, sy = g_calMaxY - g_calMinY;
-    if (sx > CAL_MIN_SPAN && sy > CAL_MIN_SPAN) {
+    storageLoadMagCal(g_calMinX, g_calMaxX, g_calMinY, g_calMaxY, g_calMinZ, g_calMaxZ);
+    float sx = g_calMaxX - g_calMinX, sz = g_calMaxZ - g_calMinZ;
+    if (sx > CAL_MIN_SPAN && sz > CAL_MIN_SPAN) {
         g_magOffsetX = (g_calMaxX + g_calMinX) / 2.0f;
-        g_magOffsetY = (g_calMaxY + g_calMinY) / 2.0f;
+        g_magOffsetZ = (g_calMaxZ + g_calMinZ) / 2.0f;
         g_calReady   = true;
     }
 
     g_magCorrection   = storageLoadMagCorrection();
     g_northCalibrated = storageLoadMagNorthSet();
-    Serial.printf("Mag cal: offsetX=%.2f offsetY=%.2f correction=%.1f ready=%d northSet=%d\n",
-                  g_magOffsetX, g_magOffsetY, g_magCorrection, g_calReady, g_northCalibrated);
+    Serial.printf("Mag cal: offsetX=%.2f offsetZ=%.2f correction=%.1f ready=%d northSet=%d\n",
+                  g_magOffsetX, g_magOffsetZ, g_magCorrection, g_calReady, g_northCalibrated);
 
     Wire.begin();
     if (mag.begin(0x30, &Wire)) {
@@ -114,10 +114,24 @@ void loop() {
         portalBegin();
     }
 
+    {
+        float lat, lon;
+        if (fetchGeocodeReady(&lat, &lon)) {
+            config.homeLat = lat;
+            config.homeLon = lon;
+        }
+    }
+
     float newCorr;
     if (portalMagCorrectionPending(newCorr)) {
         g_magCorrection = newCorr;
         storageSaveMagCorrection(newCorr);
+    }
+
+    bool compassRotateEnabled;
+    if (portalCompassRotatePending(compassRotateEnabled)) {
+        config.compassRotate = compassRotateEnabled;
+        storageSave(config);
     }
 
     static float         smoothedHeading = -1.0f;
@@ -132,6 +146,7 @@ void loop() {
         mag.getEvent(&event);
         float rx = event.magnetic.x;
         float ry = event.magnetic.y;
+        float rz = event.magnetic.z;
 
         // Initialise running min/max from first reading if we have no saved data
         static bool firstReading = true;
@@ -140,6 +155,7 @@ void loop() {
             if (!g_calReady) {
                 g_calMinX = g_calMaxX = rx;
                 g_calMinY = g_calMaxY = ry;
+                g_calMinZ = g_calMaxZ = rz;
             }
         }
 
@@ -149,23 +165,43 @@ void loop() {
             g_calSpinStart = now;
             g_calMinX = g_calMaxX = rx;
             g_calMinY = g_calMaxY = ry;
+            g_calMinZ = g_calMaxZ = rz;
             g_calReady = false;
             smoothedHeading = -1.0f;
             displaySetOtaStatus("Rotate 360\xb0 slowly...", 0);
             Serial.println("Mag calibration started");
         }
 
-        // Continuous background update of min/max
-        if (rx < g_calMinX) { g_calMinX = rx; calDirty = true; }
-        if (rx > g_calMaxX) { g_calMaxX = rx; calDirty = true; }
-        if (ry < g_calMinY) { g_calMinY = ry; calDirty = true; }
-        if (ry > g_calMaxY) { g_calMaxY = ry; calDirty = true; }
+        // Update min/max only during spin calibration or before first good calibration.
+        // Once calibrated, hard-iron bias is fixed to the device hardware and does not
+        // change as the device moves around. Continuous updates would allow magnetic
+        // anomalies in the environment (metal furniture, electronics) to corrupt the
+        // offset and cause persistent heading drift.
+        bool updateCal = g_calSpinning || !g_calReady;
+
+        // During spin: reject obvious outliers (field strength > 2× expected radius
+        // from current centre) so a momentary twitch near metal doesn't corrupt the range.
+        if (updateCal && g_calSpinning && g_calReady) {
+            float radX = (g_calMaxX - g_calMinX) * 0.5f;
+            float radZ = (g_calMaxZ - g_calMinZ) * 0.5f;
+            if (radX > 1.0f && fabsf(rx - g_magOffsetX) > radX * 2.5f) updateCal = false;
+            if (radZ > 1.0f && fabsf(rz - g_magOffsetZ) > radZ * 2.5f) updateCal = false;
+        }
+
+        if (updateCal) {
+            if (rx < g_calMinX) { g_calMinX = rx; calDirty = true; }
+            if (rx > g_calMaxX) { g_calMaxX = rx; calDirty = true; }
+            if (ry < g_calMinY) { g_calMinY = ry; calDirty = true; }
+            if (ry > g_calMaxY) { g_calMaxY = ry; calDirty = true; }
+            if (rz < g_calMinZ) { g_calMinZ = rz; calDirty = true; }
+            if (rz > g_calMaxZ) { g_calMaxZ = rz; calDirty = true; }
+        }
 
         float spanX = g_calMaxX - g_calMinX;
-        float spanY = g_calMaxY - g_calMinY;
-        if (spanX > CAL_MIN_SPAN && spanY > CAL_MIN_SPAN) {
+        float spanZ = g_calMaxZ - g_calMinZ;
+        if (spanX > CAL_MIN_SPAN && spanZ > CAL_MIN_SPAN) {
             g_magOffsetX = (g_calMaxX + g_calMinX) / 2.0f;
-            g_magOffsetY = (g_calMaxY + g_calMinY) / 2.0f;
+            g_magOffsetZ = (g_calMaxZ + g_calMinZ) / 2.0f;
             g_calReady   = true;
         }
 
@@ -177,26 +213,27 @@ void loop() {
             displaySetOtaStatus(msg, 0);
             if (now - g_calSpinStart >= CAL_DURATION_MS) {
                 g_calSpinning = false;
-                storageSaveMagCal(g_calMinX, g_calMaxX, g_calMinY, g_calMaxY);
+                storageSaveMagCal(g_calMinX, g_calMaxX, g_calMinY, g_calMaxY, g_calMinZ, g_calMaxZ);
                 calDirty = false;
                 lastCalSave = now;
                 displaySetOtaStatus("Calibration saved!", 4000);
-                Serial.printf("Spin cal done: offsetX=%.2f offsetY=%.2f\n",
-                              g_magOffsetX, g_magOffsetY);
+                Serial.printf("Spin cal done: offsetX=%.2f offsetZ=%.2f\n",
+                              g_magOffsetX, g_magOffsetZ);
             }
         }
 
-        // Periodically persist background calibration (every 60 s, only if changed)
+        // Persist calibration changes (only relevant when building up from uncalibrated state)
         if (calDirty && g_calReady && (now - lastCalSave > 60000)) {
-            storageSaveMagCal(g_calMinX, g_calMaxX, g_calMinY, g_calMaxY);
+            storageSaveMagCal(g_calMinX, g_calMaxX, g_calMinY, g_calMaxY, g_calMinZ, g_calMaxZ);
             calDirty    = false;
             lastCalSave = now;
         }
 
-        // Apply hard-iron offsets then compute raw heading
+        // Apply hard-iron offsets then compute raw heading using X and Z axes
+        // (magnetometer PCB is mounted on its side so Z is horizontal, Y is vertical)
         float cx = rx - g_magOffsetX;
-        float cy = ry - g_magOffsetY;
-        float rawHeading = atan2f(cy, cx) * (180.0f / M_PI);
+        float cz = rz - g_magOffsetZ;
+        float rawHeading = atan2f(cz, cx) * (180.0f / M_PI);
         if (rawHeading < 0.0f)    rawHeading += 360.0f;
         if (rawHeading >= 360.0f) rawHeading -= 360.0f;
 
@@ -228,7 +265,7 @@ void loop() {
             if (smoothedHeading < 0.0f)    smoothedHeading += 360.0f;
             if (smoothedHeading >= 360.0f) smoothedHeading -= 360.0f;
         }
-        displaySetNorthOffset(g_northCalibrated ? smoothedHeading : 0.0f);
+        displaySetNorthOffset((g_northCalibrated && config.compassRotate) ? smoothedHeading : 0.0f);
     }
 
     if (now - lastFrame < FRAME_MS) return;

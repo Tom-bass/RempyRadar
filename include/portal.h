@@ -25,3 +25,6 @@ bool portalSetNorthPending();
 
 // Returns true once when a new mounting-angle correction has been submitted.
 bool portalMagCorrectionPending(float &outDeg);
+
+// Returns true once when the compass-rotate toggle has been changed via the web UI.
+bool portalCompassRotatePending(bool &enabled);

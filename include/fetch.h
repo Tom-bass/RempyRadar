@@ -17,6 +17,10 @@ bool fetchConsumeWindIfReady(WindData *dest);
 // Returns true after 3 consecutive geocoding failures (bad address).
 bool fetchGeocodeFailed();
 
+// Returns true (once) after an address is resolved to coordinates.
+// Copies the resolved lat/lon into the provided pointers.
+bool fetchGeocodeReady(float *lat, float *lon);
+
 // Apply updated location/radius/airport settings to the running fetch task.
 // Does not reconnect WiFi — call only when WiFi credentials are unchanged.
 void fetchUpdateConfig(const DeviceConfig &cfg);

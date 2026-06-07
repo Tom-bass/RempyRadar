@@ -192,7 +192,7 @@ void displayApplyConfig(const DeviceConfig &cfg) {
 
 void displayInit(Adafruit_GC9A01A &tft) {
     tft.begin();
-    tft.setRotation(0);
+    tft.setRotation(3);  // 90° CCW — device mounted on its side
     tft.fillScreen(0x0000);
 
     for (int i = 0; i < MAX_PINGS; i++) {
@@ -218,25 +218,23 @@ void displayInit(Adafruit_GC9A01A &tft) {
 }
 
 void displayShowConnecting(Adafruit_GC9A01A &tft) {
-    tft.setTextSize(2);
     tft.setTextColor(color565(0, 255, 0));
-    tft.setCursor(60, 104);
+    tft.setTextSize(3);
+    tft.setCursor(30, 92);   // "Connecting" 10 chars × 18px = 180px → x=(240-180)/2
     tft.print("Connecting");
-    tft.setCursor(102, 124);
+    tft.setCursor(93, 124);  // "..." 3 chars × 18px = 54px → x=(240-54)/2
     tft.print("...");
 }
 
 void displayShowConnected(Adafruit_GC9A01A &tft, const String &ip) {
     tft.fillScreen(0x0000);
     tft.setTextColor(color565(0, 200, 0));
-    tft.setTextSize(1);
-    tft.setCursor(93, 86);   // "Settings:" 9 chars × 6px = 54px → x=(240-54)/2
-    tft.print("Settings:");
     tft.setTextSize(2);
-    tft.setCursor((240 - (int)ip.length() * 12) / 2, 104);
+    tft.setCursor(66, 88);   // "Settings:" 9 chars × 12px = 108px → x=(240-108)/2
+    tft.print("Settings:");
+    tft.setCursor((240 - (int)ip.length() * 12) / 2, 112);
     tft.print(ip);
-    tft.setTextSize(1);
-    tft.setCursor(75, 130);  // "in your browser" 15 chars × 6px = 90px → x=(240-90)/2
+    tft.setCursor(30, 136);  // "in your browser" 15 chars × 12px = 180px → x=(240-180)/2
     tft.print("in your browser");
 }
 
@@ -244,30 +242,31 @@ void displayShowGeocodeError(Adafruit_GC9A01A &tft) {
     tft.fillScreen(0x0000);
     tft.setTextSize(2);
     tft.setTextColor(color565(255, 80, 0));
-    tft.setCursor(78, 76);   // "Address"   7 chars × 12px = 84px  → x=(240-84)/2
+    tft.setCursor(78, 64);   // "Address"   7 chars × 12px = 84px  → x=(240-84)/2
     tft.print("Address");
-    tft.setCursor(66, 96);   // "not found" 9 chars × 12px = 108px → x=(240-108)/2
+    tft.setCursor(66, 88);   // "not found" 9 chars × 12px = 108px → x=(240-108)/2
     tft.print("not found");
-    tft.setTextSize(1);
     tft.setTextColor(color565(0, 200, 0));
-    tft.setCursor(72, 128);  // 16 chars × 6px = 96px → x=(240-96)/2
+    tft.setCursor(24, 120);  // "Connect to WiFi:" 16 chars × 12px = 192px → x=(240-192)/2
     tft.print("Connect to WiFi:");
-    tft.setCursor(72, 142);
-    tft.print("RempyRadar-Setup");
-    tft.setCursor(81, 156);  // "to try again." 13 chars × 6px = 78px → x=(240-78)/2
+    tft.setCursor(60, 144);  // "RempyRadar" 10 chars × 12px = 120px → x=(240-120)/2
+    tft.print("RempyRadar");
+    tft.setCursor(42, 168);  // "to try again." 13 chars × 12px = 156px → x=(240-156)/2
     tft.print("to try again.");
 }
 
 void displayShowSetupScreen(Adafruit_GC9A01A &tft) {
     tft.fillScreen(0x0000);
     tft.setTextColor(color565(0, 255, 0));
-    tft.setTextSize(1);
-    tft.setCursor(46, 96);
+    tft.setTextSize(2);
+    tft.setCursor(24, 76);   // "Connect to WiFi:" 16 chars × 12px = 192px → x=(240-192)/2
     tft.print("Connect to WiFi:");
-    tft.setCursor(46, 112);
-    tft.print("RempyRadar-Setup");
-    tft.setCursor(46, 136);
-    tft.print("to get started.");
+    tft.setCursor(60, 100);  // "RempyRadar" 10 chars × 12px = 120px → x=(240-120)/2
+    tft.print("RempyRadar");
+    tft.setCursor(24, 124);  // "Open any webpage" 16 chars × 12px = 192px → x=(240-192)/2
+    tft.print("Open any webpage");
+    tft.setCursor(36, 148);  // "to get started" 14 chars × 12px = 168px → x=(240-168)/2
+    tft.print("to get started");
 }
 
 // ---------------------------------------------------------------------------
@@ -829,7 +828,7 @@ void displayRenderFrame(Adafruit_GC9A01A &tft,
         }
     }
 
-    tft.drawRGBBitmap(0, 0, g_canvas->getBuffer(), 240, 240);
+    tft.drawRGBBitmap(-3, -3, g_canvas->getBuffer(), 240, 240);
 
     g_sweep += SWEEP_SPEED;
     if (g_sweep >= 360.0f) g_sweep -= 360.0f;

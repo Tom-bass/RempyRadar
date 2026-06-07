@@ -25,6 +25,7 @@ bool storageLoad(DeviceConfig &cfg) {
     cfg.altPalette     = ALT_PALETTE_CLASSIC;
     strncpy(cfg.timezone, "UTC0", sizeof(cfg.timezone));
     cfg.clockPosition  = 0;
+    cfg.compassRotate  = true;
     cfg.showNorth      = true;
     cfg.northColor     = { 255,   0,   0 };
     cfg.ringColor      = {   0,  60,   0 };
@@ -62,6 +63,7 @@ bool storageLoad(DeviceConfig &cfg) {
         prefs.getString("address",  cfg.homeAddress, sizeof(cfg.homeAddress));
         prefs.getString("timezone", cfg.timezone,    sizeof(cfg.timezone));
         cfg.clockPosition  = (uint8_t)prefs.getUChar("clockPos", 0);
+        cfg.compassRotate  = prefs.getBool("compassRotate", true);
         cfg.showNorth      = prefs.getBool("showNorth", true);
         cfg.northColor     = { 255, 0, 0 };
         prefs.getBytes("northColor",  &cfg.northColor,  sizeof(RGBColor));
@@ -102,6 +104,7 @@ void storageSave(const DeviceConfig &cfg) {
     prefs.putString("address",   cfg.homeAddress);
     prefs.putString("timezone",  cfg.timezone);
     prefs.putUChar("clockPos",   cfg.clockPosition);
+    prefs.putBool("compassRotate", cfg.compassRotate);
     prefs.putBool("showNorth",   cfg.showNorth);
     prefs.putBytes("northColor", &cfg.northColor,  sizeof(RGBColor));
     prefs.putBytes("ringColor",  &cfg.ringColor,   sizeof(RGBColor));
@@ -119,23 +122,27 @@ void storageErase() {
     prefs.end();
 }
 
-void storageSaveMagCal(float minX, float maxX, float minY, float maxY) {
+void storageSaveMagCal(float minX, float maxX, float minY, float maxY, float minZ, float maxZ) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putFloat("magMinX", minX);
     prefs.putFloat("magMaxX", maxX);
     prefs.putFloat("magMinY", minY);
     prefs.putFloat("magMaxY", maxY);
+    prefs.putFloat("magMinZ", minZ);
+    prefs.putFloat("magMaxZ", maxZ);
     prefs.end();
 }
 
-void storageLoadMagCal(float &minX, float &maxX, float &minY, float &maxY) {
+void storageLoadMagCal(float &minX, float &maxX, float &minY, float &maxY, float &minZ, float &maxZ) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     minX = prefs.getFloat("magMinX", 0.0f);
     maxX = prefs.getFloat("magMaxX", 0.0f);
     minY = prefs.getFloat("magMinY", 0.0f);
     maxY = prefs.getFloat("magMaxY", 0.0f);
+    minZ = prefs.getFloat("magMinZ", 0.0f);
+    maxZ = prefs.getFloat("magMaxZ", 0.0f);
     prefs.end();
 }
 

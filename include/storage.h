@@ -38,6 +38,7 @@ struct DeviceConfig {
     char     homeAddress[128];     // if non-empty and lat/lon==0, geocode on first WiFi connect
     char     timezone[64];         // POSIX TZ string e.g. "AEST-10AEDT,M10.1.0,M4.1.0/3"
     uint8_t  clockPosition;        // 0=BL 1=BR 2=TL 3=TR
+    bool     compassRotate;        // rotate display to follow magnetic north (requires Set North)
     bool     showNorth;            // show "N" north indicator
     RGBColor northColor;           // colour of the N
     RGBColor ringColor;            // radar rings, crosshair lines, range labels
@@ -55,8 +56,8 @@ void storageErase();
 
 // Magnetometer hard-iron calibration — stores the observed field range so
 // continuous background calibration survives reboots.
-void storageSaveMagCal(float minX, float maxX, float minY, float maxY);
-void storageLoadMagCal(float &minX, float &maxX, float &minY, float &maxY);
+void storageSaveMagCal(float minX, float maxX, float minY, float maxY, float minZ, float maxZ);
+void storageLoadMagCal(float &minX, float &maxX, float &minY, float &maxY, float &minZ, float &maxZ);
 
 // Magnetometer mounting-angle correction (degrees, added to raw heading).
 void  storageSaveMagCorrection(float deg);

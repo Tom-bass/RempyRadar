@@ -15,8 +15,10 @@ static bool           g_restartPending = false;
 static unsigned long  g_restartAt      = 0;
 static bool           g_magCalPending   = false;
 static bool           g_setNorthPending = false;
-static bool           g_magCorrPending  = false;
-static float          g_magCorrValue    = 0.0f;
+static bool           g_magCorrPending        = false;
+static float          g_magCorrValue          = 0.0f;
+static bool           g_compassRotatePending  = false;
+static bool           g_compassRotateValue    = true;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -138,6 +140,7 @@ static void handleSave() {
     strncpy(cfg.timezone, g_server.arg("tz").c_str(), sizeof(cfg.timezone) - 1);
     if (cfg.timezone[0] == '\0') strncpy(cfg.timezone, "UTC0", sizeof(cfg.timezone));
     cfg.clockPosition = (uint8_t)constrain(g_server.arg("clockPos").toInt(), 0, 3);
+    cfg.compassRotate = oldCfg.compassRotate;  // managed by /set-compass-rotate, not the main form
     cfg.showNorth     = g_server.hasArg("showNorth");
     cfg.northColor    = { 255, 0, 0 };   parseColor("northColor",  cfg.northColor);
     cfg.ringColor     = { 0, 60, 0 };    parseColor("ringColor",   cfg.ringColor);
@@ -224,6 +227,12 @@ static void handleMagCorrection() {
     g_server.send(200, "text/plain", "ok");
 }
 
+static void handleSetCompassRotate() {
+    g_compassRotateValue   = g_server.arg("enabled") == "1";
+    g_compassRotatePending = true;
+    g_server.send(200, "text/plain", "ok");
+}
+
 static void handleConfig() {
     DeviceConfig cfg;
     storageLoad(cfg);
@@ -239,6 +248,8 @@ static void handleConfig() {
     doc["radius"]        = (int)cfg.radiusKm;
     doc["timezone"]      = cfg.timezone;
     doc["clockPos"]      = cfg.clockPosition;
+    doc["northCalibrated"] = storageLoadMagNorthSet();
+    doc["compassRotate"] = cfg.compassRotate;
     doc["showNorth"]     = cfg.showNorth;
     {
         char h[8];
@@ -302,7 +313,8 @@ void portalStartSettingsServer() {
     g_server.on("/ota-check",   HTTP_POST, handleOtaCheck);
     g_server.on("/mag-calibrate",   HTTP_POST, handleMagCal);
     g_server.on("/set-north",       HTTP_POST, handleSetNorth);
-    g_server.on("/mag-correction",  HTTP_POST, handleMagCorrection);
+    g_server.on("/mag-correction",      HTTP_POST, handleMagCorrection);
+    g_server.on("/set-compass-rotate",  HTTP_POST, handleSetCompassRotate);
     g_server.onNotFound(handleRoot);
     g_server.begin();
     Serial.println("Settings: server started at http://" + WiFi.localIP().toString());
@@ -334,6 +346,13 @@ bool portalSetNorthPending() {
     return true;
 }
 
+bool portalCompassRotatePending(bool &enabled) {
+    if (!g_compassRotatePending) return false;
+    g_compassRotatePending = false;
+    enabled = g_compassRotateValue;
+    return true;
+}
+
 bool portalMagCorrectionPending(float &outDeg) {
     if (!g_magCorrPending) return false;
     g_magCorrPending = false;
@@ -347,7 +366,7 @@ void portalBegin() {
         Serial.println("Portal: LittleFS mount failed");
     }
 
-    WiFi.softAP("RempyRadar-Setup");
+    WiFi.softAP("RempyRadar");
     delay(100);
     IPAddress ip = WiFi.softAPIP();
     Serial.println("Portal: AP IP " + ip.toString());
@@ -367,7 +386,7 @@ void portalBegin() {
     g_server.onNotFound(handleRoot);
     g_server.begin();
 
-    Serial.println("Portal: ready — connect to 'RempyRadar-Setup'");
+    Serial.println("Portal: ready — connect to 'RempyRadar'");
 
     for (;;) {
         g_dns.processNextRequest();
