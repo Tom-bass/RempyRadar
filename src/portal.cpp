@@ -72,7 +72,13 @@ static void handleSave() {
 
     // WiFi
     strncpy(cfg.wifiSSID, g_server.arg("ssid").c_str(), sizeof(cfg.wifiSSID) - 1);
-    strncpy(cfg.wifiPass, g_server.arg("pass").c_str(), sizeof(cfg.wifiPass) - 1);
+    String submittedPass = g_server.arg("pass");
+    if (submittedPass == "****") {
+        // Sentinel — user didn't change the password; preserve existing value from NVS
+        strncpy(cfg.wifiPass, oldCfg.wifiPass, sizeof(cfg.wifiPass) - 1);
+    } else {
+        strncpy(cfg.wifiPass, submittedPass.c_str(), sizeof(cfg.wifiPass) - 1);
+    }
 
     // Location — four cases:
     //   1. New address typed            → geocode on next connect
@@ -145,6 +151,9 @@ static void handleSave() {
     cfg.northColor    = { 255, 0, 0 };   parseColor("northColor",  cfg.northColor);
     cfg.ringColor     = { 0, 60, 0 };    parseColor("ringColor",   cfg.ringColor);
     cfg.sweepColor    = { 0, 255, 0 };   parseColor("sweepColor",  cfg.sweepColor);
+
+    // Icon scale (100–200 %, clamped; 100 is default)
+    cfg.iconScale = (uint8_t)constrain(g_server.arg("iconScale").toInt(), 100, 200);
 
     // Altitude palette
     cfg.altPalette = (uint8_t)constrain(g_server.arg("palette").toInt(), 0, 4);
@@ -241,7 +250,7 @@ static void handleConfig() {
     doc.clear();
     doc["firmware"]      = FIRMWARE_VERSION;
     doc["ssid"]          = cfg.wifiSSID;
-    doc["pass"]          = cfg.wifiPass;
+    doc["pass"]          = cfg.wifiPass[0] ? "****" : "";
     doc["lat"]           = cfg.homeLat;
     doc["lon"]           = cfg.homeLon;
     doc["hasAddress"]    = (cfg.homeAddress[0] != '\0');
@@ -282,6 +291,7 @@ static void handleConfig() {
         doc["flightTypeColor"] = h;
     }
     doc["altPalette"]    = cfg.altPalette;
+    doc["iconScale"]     = cfg.iconScale ? cfg.iconScale : 100;
 
     if (cfg.altPalette == ALT_PALETTE_CUSTOM) {
         JsonArray colors = doc.createNestedArray("customColors");

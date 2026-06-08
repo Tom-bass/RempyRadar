@@ -58,6 +58,7 @@ static bool         g_showAirportNames  = true;
 static uint16_t     g_airportColor565   = 0x7800; // yellowish default
 static bool         g_showClimbDescent      = true;
 static bool         g_showFlightNumber      = true;
+static uint8_t      g_iconScale             = 100;
 static bool         g_showFlightReg         = false;
 static bool         g_showFlightType        = false;
 static uint16_t     g_flightNumColor565        = 0x07E0;
@@ -184,6 +185,7 @@ void displayApplyConfig(const DeviceConfig &cfg) {
     g_flightTypeColor565 = color565(cfg.flightTypeColor.r, cfg.flightTypeColor.g, cfg.flightTypeColor.b);
     g_altPalette        = cfg.altPalette;
     memcpy(g_customAltColors, cfg.customAltColors, sizeof(g_customAltColors));
+    g_iconScale         = cfg.iconScale ? cfg.iconScale : 100;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,10 +221,10 @@ void displayInit(Adafruit_GC9A01A &tft) {
 
 void displayShowConnecting(Adafruit_GC9A01A &tft) {
     tft.setTextColor(color565(0, 255, 0));
-    tft.setTextSize(3);
-    tft.setCursor(30, 92);   // "Connecting" 10 chars × 18px = 180px → x=(240-180)/2
+    tft.setTextSize(2);
+    tft.setCursor(60, 100);  // "Connecting" 10 chars × 12px = 120px → x=(240-120)/2
     tft.print("Connecting");
-    tft.setCursor(93, 124);  // "..." 3 chars × 18px = 54px → x=(240-54)/2
+    tft.setCursor(102, 124); // "..." 3 chars × 12px = 36px → x=(240-36)/2
     tft.print("...");
 }
 
@@ -497,18 +499,20 @@ static void fadePings() {
 }
 
 static void drawPingIcon(int px, int py, const char *cat, float track, uint16_t col) {
+    float s = g_iconScale / 100.0f;
     char c0 = cat[0], c1 = cat[1];
 
     // Helicopter: cross — two clean lines, no heading needed
     if (c0 == 'A' && c1 == '7') {
-        g_canvas->drawLine(px - 3, py,     px + 3, py,     col);
-        g_canvas->drawLine(px,     py - 3, px,     py + 3, col);
+        int r = max(1, (int)roundf(3.0f * s));
+        g_canvas->drawLine(px - r, py,     px + r, py,     col);
+        g_canvas->drawLine(px,     py - r, px,     py + r, col);
         return;
     }
 
     // No heading data: small dot
     if (track < 0.0f) {
-        g_canvas->fillCircle(px, py, 2, col);
+        g_canvas->fillCircle(px, py, max(1, (int)roundf(2.0f * s)), col);
         return;
     }
 
@@ -517,16 +521,16 @@ static void drawPingIcon(int px, int py, const char *cat, float track, uint16_t 
     float cos_t = cosf(rad);
 
     // Same geometry for all fixed-wing — fill distinguishes heavy from light
-    int tx = (int)roundf(px + 7.0f * sin_t);
-    int ty = (int)roundf(py - 7.0f * cos_t);
+    int tx = (int)roundf(px + 7.0f * s * sin_t);
+    int ty = (int)roundf(py - 7.0f * s * cos_t);
 
-    float rcx = px - 2.0f * sin_t;
-    float rcy = py + 2.0f * cos_t;
+    float rcx = px - 2.0f * s * sin_t;
+    float rcy = py + 2.0f * s * cos_t;
 
-    int b1x = (int)roundf(rcx - 2.0f * cos_t);
-    int b1y = (int)roundf(rcy - 2.0f * sin_t);
-    int b2x = (int)roundf(rcx + 2.0f * cos_t);
-    int b2y = (int)roundf(rcy + 2.0f * sin_t);
+    int b1x = (int)roundf(rcx - 2.0f * s * cos_t);
+    int b1y = (int)roundf(rcy - 2.0f * s * sin_t);
+    int b2x = (int)roundf(rcx + 2.0f * s * cos_t);
+    int b2y = (int)roundf(rcy + 2.0f * s * sin_t);
 
     bool isLight = (c0 == 'A' && (c1 == '1' || c1 == '2'));
     if (isLight) {
@@ -604,6 +608,12 @@ static void drawPingIcons() {
 static void drawPingLabels() {
     if (!g_showFlightNumber && !g_showFlightReg && !g_showFlightType) return;
 
+    float s       = g_iconScale / 100.0f;
+    int textSz    = max(1, (int)roundf(s));
+    int charHW    = 3 * textSz;   // half char width: textSize 1 → 3px, 2 → 6px
+    int lineH     = 9 * textSz;   // row height with gap: textSize 1 → 9px, 2 → 18px
+    int iconGap   = (int)roundf(6.0f * s);  // vertical gap from icon centre to first label
+
     for (int i = 0; i < MAX_PINGS; i++) {
         if (!g_pings[i].active) continue;
         if (g_pings[i].groundLevel) continue;
@@ -617,7 +627,7 @@ static void drawPingLabels() {
             return scaleColor565(col565, br);
         };
 
-        g_canvas->setTextSize(1);
+        g_canvas->setTextSize(textSz);
 
         char indicator = 0;
         if (g_showClimbDescent) {
@@ -625,30 +635,30 @@ static void drawPingLabels() {
             else if (g_pings[i].baroRate < -200) indicator = '-';
         }
 
-        int lineY = g_pings[i].y + 6;
+        int lineY = g_pings[i].y + iconGap;
 
         if (g_showFlightNumber) {
             g_canvas->setTextColor(labelCol(g_flightNumColor565));
             int labelLen = strlen(g_pings[i].callsign) + (indicator ? 1 : 0);
-            g_canvas->setCursor(g_pings[i].x - (labelLen * 3), lineY);
+            g_canvas->setCursor(g_pings[i].x - (labelLen * charHW), lineY);
             g_canvas->print(g_pings[i].callsign);
             if (indicator) g_canvas->print(indicator);
-            lineY += 9;
+            lineY += lineH;
         }
 
         if (g_showFlightReg && g_pings[i].reg[0] != '\0' &&
             strcmp(g_pings[i].reg, g_pings[i].callsign) != 0) {
             g_canvas->setTextColor(labelCol(g_flightRegColor565));
             int len = strlen(g_pings[i].reg);
-            g_canvas->setCursor(g_pings[i].x - (len * 3), lineY);
+            g_canvas->setCursor(g_pings[i].x - (len * charHW), lineY);
             g_canvas->print(g_pings[i].reg);
-            lineY += 9;
+            lineY += lineH;
         }
 
         if (g_showFlightType && g_pings[i].acType[0] != '\0') {
             g_canvas->setTextColor(labelCol(g_flightTypeColor565));
             int len = strlen(g_pings[i].acType);
-            g_canvas->setCursor(g_pings[i].x - (len * 3), lineY);
+            g_canvas->setCursor(g_pings[i].x - (len * charHW), lineY);
             g_canvas->print(g_pings[i].acType);
         }
     }

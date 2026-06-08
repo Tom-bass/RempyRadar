@@ -43,6 +43,7 @@ struct DeviceConfig {
     RGBColor northColor;           // colour of the N
     RGBColor ringColor;            // radar rings, crosshair lines, range labels
     RGBColor sweepColor;           // sweep line and trail
+    uint8_t  iconScale;            // icon + label scale % (100 = default, 200 = double)
 };
 
 // Load config from NVS. Returns true if a saved config exists.

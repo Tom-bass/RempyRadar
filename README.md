@@ -92,38 +92,7 @@ Settings available via the portal (also reachable at the device IP after setup):
 
 ---
 
-## Compass Calibration
-
-The display is compass-stabilised: the N marker always points to magnetic north and the radar
-rotates to match. This requires a one-time setup.
-
-**Before calibration:** north is locked to the top of the display (safe default).
-
-> **Note:** Compass rotation is a work-in-progress feature. It works best in open areas away from
-> strong magnetic sources. Enable at your own risk — the radar remains fully functional with it off.
-
-### Step 1 — Hard-iron calibration (required for compass rotation)
-
-Open the device IP in a browser → **Compass** section → tap **Calibrate**.
-Slowly rotate the device **flat on a surface** through a full 360° in 20 seconds.
-This removes the constant magnetic bias from the PCB components themselves.
-
-The calibration is saved to NVS and is stable across reboots. Once established it is frozen —
-environmental anomalies (metal furniture, electronics) will not corrupt it while the device moves
-around. Re-run the spin to recalibrate.
-
-### Step 2 — Set North (required once)
-
-1. Use a phone compass to find north
-2. Hold the device flat (as it will be used) and point the **USB port of the XIAO toward north**
-3. Open the device IP in a browser → **Compass** section → tap **Set North**
-
-That's it. The reference is saved to NVS and survives every reboot.
-
-### Step 3 — Enable compass rotation
-
-After Set North is complete, a **Compass rotation** toggle appears in the Compass section.
-Enable it to have the radar rotate so north is always at the top.
+## Compass Calibration *(WIP, to be completed)*
 
 ---
 

@@ -296,6 +296,13 @@
       <button type="button" onclick="confirmReset('Aircraft Labels',resetLabels)" title="Reset to defaults" style="background:none;border:1px solid #2a2a2a;color:#555;cursor:pointer;font-size:1rem;width:28px;height:28px;border-radius:50%;padding:0;line-height:1;transform:rotate(-45deg)">&#8634;</button>
     </div>
 
+    <label class="field" for="iconScale">Icon &amp; label scale</label>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+      <input type="number" id="iconScale" name="iconScale" min="100" max="200" step="10" value="100" style="width:80px">
+      <span style="color:#555;font-size:0.82rem">% &mdash; 200% doubles icon and text size</span>
+    </div>
+    <div class="sep"></div>
+
     <!-- Flight number -->
     <div class="toggle-row">
       <div>
@@ -636,6 +643,7 @@ function resetDisplay() {
 }
 
 function resetLabels() {
+  document.getElementById('iconScale').value          = '100';
   document.getElementById('showFlightNumber').checked = true;
   document.getElementById('showFlightReg').checked    = false;
   document.getElementById('showFlightType').checked   = false;
@@ -748,6 +756,7 @@ function populateForm(c) {
   if (c.flightNumColor)  setLabelColor('FlightNum',  c.flightNumColor);
   if (c.flightRegColor)  setLabelColor('FlightReg',  c.flightRegColor);
   if (c.flightTypeColor) setLabelColor('FlightType', c.flightTypeColor);
+  if (c.iconScale) document.getElementById('iconScale').value = c.iconScale;
   onClockToggle();
   onAltToggle();
   onAirportsToggle();
