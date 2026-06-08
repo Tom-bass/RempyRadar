@@ -206,11 +206,15 @@ static void handleSave() {
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             "<style>body{background:#111;color:#fff;font-family:sans-serif;"
             "text-align:center;padding:60px 20px}h2{color:#00dc00}"
-            "a{color:#00dc00}</style>"
+            ".btn{display:inline-block;margin-top:16px;padding:12px 28px;"
+            "background:transparent;border:1px solid #00dc00;color:#00dc00;"
+            "border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;"
+            "text-decoration:none;letter-spacing:0.3px}"
+            ".btn:hover{background:#00dc0018}</style>"
             "</head><body>"
             "<h2>Saved!</h2>"
             "<p>Settings applied to the running radar.</p>"
-            "<p><a href='/'>Back to settings</a></p>"
+            "<a class='btn' href='/'>Return to settings</a>"
             "</body></html>");
     }
 }
