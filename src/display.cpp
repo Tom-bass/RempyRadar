@@ -38,6 +38,7 @@ struct Ping {
 
 static GFXcanvas16 *g_canvas        = nullptr;
 static float        g_sweep         = 0.0f;
+static float        g_sweepSpeed    = 1.0f;  // multiplier: 0.5 = half speed, 2.0 = double
 static float        g_northOffset   = 0.0f;  // device compass heading; subtracted from all bearings
 static Ping         g_pings[MAX_PINGS];
 static WindData     g_wind          = { 0.0f, 0, false };
@@ -186,6 +187,7 @@ void displayApplyConfig(const DeviceConfig &cfg) {
     g_altPalette        = cfg.altPalette;
     memcpy(g_customAltColors, cfg.customAltColors, sizeof(g_customAltColors));
     g_iconScale         = cfg.iconScale ? cfg.iconScale : 100;
+    g_sweepSpeed        = (cfg.sweepSpeed ? cfg.sweepSpeed : 100) / 100.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +474,7 @@ static void checkSweepHitsPlanes(const Plane *planes, int planeCount,
         if (px < 0 || px >= 240 || py < 0 || py >= 240) continue;
         float screenBearing = fmodf(geoBearing - g_northOffset + 360.0f, 360.0f);
         float diff          = fmodf(g_sweep - screenBearing + 360.0f, 360.0f);
-        if (diff < SWEEP_SPEED * 1.5f) {
+        if (diff < SWEEP_SPEED * g_sweepSpeed * 1.5f) {
             triggerPing(geoBearing, distKm, planes[i].callsign,
                         planes[i].flight, planes[i].reg, planes[i].acType,
                         altitudeColor(planes[i].altFt),
@@ -840,6 +842,6 @@ void displayRenderFrame(Adafruit_GC9A01A &tft,
 
     tft.drawRGBBitmap(-3, -3, g_canvas->getBuffer(), 240, 240);
 
-    g_sweep += SWEEP_SPEED;
+    g_sweep += SWEEP_SPEED * g_sweepSpeed;
     if (g_sweep >= 360.0f) g_sweep -= 360.0f;
 }

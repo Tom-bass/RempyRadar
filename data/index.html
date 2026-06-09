@@ -287,6 +287,22 @@
       <div class="stop-grid"  id="customGrid" style="display:none"></div>
       <div style="position:absolute;left:-9999px" aria-hidden="true" id="colorInputs"></div>
     </div>
+
+    <div class="toggle-row" style="border-top:1px solid #222;margin-top:16px;padding-top:16px;border-bottom:none">
+      <div>
+        <div class="toggle-label">Radar orientation</div>
+        <div class="toggle-sub">Rotate the display so the direction your desk faces points up.</div>
+      </div>
+      <select id="northShift" name="northShift"
+              style="background:#111;color:#00dc00;border:1px solid #00dc00;
+                     border-radius:6px;padding:8px 10px;font-size:0.85rem;
+                     cursor:pointer;flex-shrink:0">
+        <option value="0">North up</option>
+        <option value="270">East up</option>
+        <option value="180">South up</option>
+        <option value="90">West up</option>
+      </select>
+    </div>
   </section>
 
   <!-- Aircraft Labels -->
@@ -414,6 +430,12 @@
              style="position:absolute;left:-9999px" oninput="onRadarPickerInput('sweep')">
     </div>
 
+    <!-- Sweep speed -->
+    <label class="field" style="margin-top:16px">Sweep speed &mdash; <span id="sweepSpeedVal">100</span>%</label>
+    <input type="range" id="sweepSpeed" name="sweepSpeed" min="50" max="400" step="10" value="100"
+           oninput="document.getElementById('sweepSpeedVal').textContent=this.value"
+           style="width:100%;accent-color:#00dc00;margin-top:4px;cursor:pointer">
+
   </section>
 
   <button type="submit" class="btn">Save &amp; Start Radar</button>
@@ -488,6 +510,7 @@
       </label>
     </div>
   </div>
+
 </section>
 
 <script>
@@ -638,6 +661,7 @@ function resetDisplay() {
   document.getElementById('showClimbDescent').checked = true;
   document.getElementById('clockPos').value           = '0';
   document.getElementById('palette').value            = '0';
+  document.getElementById('northShift').value         = '0';
   for (var i = 0; i < 10; i++) setColor(i, PRESETS[0][i]);
   onClockToggle(); onAltToggle(); onPaletteChange();
 }
@@ -659,6 +683,8 @@ function resetRadar() {
   setRadarColor('north', RADAR_DEFAULTS.north);
   setRadarColor('ring',  RADAR_DEFAULTS.ring);
   setRadarColor('sweep', RADAR_DEFAULTS.sweep);
+  document.getElementById('sweepSpeed').value = 100;
+  document.getElementById('sweepSpeedVal').textContent = '100';
   onNorthToggle();
 }
 
@@ -765,9 +791,14 @@ function populateForm(c) {
   document.getElementById('compassRotateSection').style.display = c.northCalibrated ? '' : 'none';
   document.getElementById('compassRotate').checked = (c.compassRotate !== undefined) ? !!c.compassRotate : true;
   document.getElementById('showNorth').checked = (c.showNorth !== undefined) ? !!c.showNorth : true;
+  if (c.northShift !== undefined) document.getElementById('northShift').value = c.northShift;
   if (c.northColor) setRadarColor('north', c.northColor);
   if (c.ringColor)  setRadarColor('ring',  c.ringColor);
   if (c.sweepColor) setRadarColor('sweep', c.sweepColor);
+  if (c.sweepSpeed !== undefined) {
+    document.getElementById('sweepSpeed').value = c.sweepSpeed;
+    document.getElementById('sweepSpeedVal').textContent = c.sweepSpeed;
+  }
   onNorthToggle();
   syncLabelColor('FlightNum');
   syncLabelColor('FlightReg');

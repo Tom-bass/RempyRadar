@@ -44,6 +44,8 @@ struct DeviceConfig {
     RGBColor ringColor;            // radar rings, crosshair lines, range labels
     RGBColor sweepColor;           // sweep line and trail
     uint8_t  iconScale;            // icon + label scale % (100 = default, 200 = double)
+    uint16_t sweepSpeed;           // sweep animation speed % (50–400, default 100)
+    uint16_t northShift;           // fixed display rotation offset: 0, 90, 180, or 270 degrees
 };
 
 // Load config from NVS. Returns true if a saved config exists.

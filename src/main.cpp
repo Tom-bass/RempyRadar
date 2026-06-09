@@ -265,7 +265,8 @@ void loop() {
             if (smoothedHeading < 0.0f)    smoothedHeading += 360.0f;
             if (smoothedHeading >= 360.0f) smoothedHeading -= 360.0f;
         }
-        displaySetNorthOffset((g_northCalibrated && config.compassRotate) ? smoothedHeading : 0.0f);
+        float baseOffset = (g_northCalibrated && config.compassRotate) ? smoothedHeading : 0.0f;
+        displaySetNorthOffset(fmodf(baseOffset + (float)config.northShift, 360.0f));
     }
 
     if (now - lastFrame < FRAME_MS) return;

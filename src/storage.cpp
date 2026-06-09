@@ -31,6 +31,8 @@ bool storageLoad(DeviceConfig &cfg) {
     cfg.ringColor      = {   0,  60,   0 };
     cfg.sweepColor     = {   0, 255,   0 };
     cfg.iconScale      = 100;
+    cfg.sweepSpeed     = 100;
+    cfg.northShift     = 0;
 
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
@@ -73,7 +75,9 @@ bool storageLoad(DeviceConfig &cfg) {
         cfg.sweepColor     = { 0, 255, 0 };
         prefs.getBytes("sweepColor",  &cfg.sweepColor,  sizeof(RGBColor));
         prefs.getBytes("customAlt", cfg.customAltColors, sizeof(cfg.customAltColors));
-        cfg.iconScale = prefs.getUChar("iconScale", 100);
+        cfg.iconScale  = prefs.getUChar("iconScale", 100);
+        cfg.sweepSpeed = prefs.getUShort("sweepSpeed", 100);
+        cfg.northShift = prefs.getUShort("northShift", 0);
         if (cfg.timezone[0] == '\0') strncpy(cfg.timezone, "UTC0", sizeof(cfg.timezone));
     }
 
@@ -113,7 +117,9 @@ void storageSave(const DeviceConfig &cfg) {
     prefs.putBytes("sweepColor", &cfg.sweepColor,  sizeof(RGBColor));
     prefs.putUChar("altPalette", cfg.altPalette);
     prefs.putBytes("customAlt",  cfg.customAltColors, sizeof(cfg.customAltColors));
-    prefs.putUChar("iconScale",  cfg.iconScale);
+    prefs.putUChar("iconScale",   cfg.iconScale);
+    prefs.putUShort("sweepSpeed", cfg.sweepSpeed);
+    prefs.putUShort("northShift", cfg.northShift);
     prefs.putBool("configured",  true);
     prefs.end();
 }

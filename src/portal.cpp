@@ -153,7 +153,18 @@ static void handleSave() {
     cfg.sweepColor    = { 0, 255, 0 };   parseColor("sweepColor",  cfg.sweepColor);
 
     // Icon scale (100–200 %, clamped; 100 is default)
-    cfg.iconScale = (uint8_t)constrain(g_server.arg("iconScale").toInt(), 100, 200);
+    cfg.iconScale  = (uint8_t)constrain(g_server.arg("iconScale").toInt(), 100, 200);
+    cfg.sweepSpeed = g_server.hasArg("sweepSpeed")
+        ? (uint16_t)constrain(g_server.arg("sweepSpeed").toInt(), 50, 400)
+        : oldCfg.sweepSpeed;
+
+    // Radar orientation — only 0/90/180/270 are valid; fall back to saved value
+    if (g_server.hasArg("northShift")) {
+        int ns = g_server.arg("northShift").toInt();
+        cfg.northShift = (ns == 90 || ns == 180 || ns == 270) ? (uint16_t)ns : 0;
+    } else {
+        cfg.northShift = oldCfg.northShift;
+    }
 
     // Altitude palette
     cfg.altPalette = (uint8_t)constrain(g_server.arg("palette").toInt(), 0, 4);
@@ -295,7 +306,9 @@ static void handleConfig() {
         doc["flightTypeColor"] = h;
     }
     doc["altPalette"]    = cfg.altPalette;
-    doc["iconScale"]     = cfg.iconScale ? cfg.iconScale : 100;
+    doc["iconScale"]     = cfg.iconScale  ? cfg.iconScale  : 100;
+    doc["sweepSpeed"]    = cfg.sweepSpeed ? cfg.sweepSpeed : 100;
+    doc["northShift"]    = cfg.northShift;
 
     if (cfg.altPalette == ALT_PALETTE_CUSTOM) {
         JsonArray colors = doc.createNestedArray("customColors");
