@@ -399,7 +399,7 @@ static void populatePing(int slot, float geoBearing, float distKm, const char *c
     strncpy(g_pings[slot].acType,   acType,   7);
     g_pings[slot].acType[7]        = '\0';
     g_pings[slot].brightness       = 255;
-    g_pings[slot].holdUntil        = millis() + 4000;
+    g_pings[slot].holdUntil        = millis() + (unsigned long)(4000.0f / g_sweepSpeed);
     g_pings[slot].active           = true;
     g_pings[slot].lastTriggerSweep = g_sweep;
     g_pings[slot].altColor         = altColor;
@@ -474,7 +474,7 @@ static void checkSweepHitsPlanes(const Plane *planes, int planeCount,
         if (px < 0 || px >= 240 || py < 0 || py >= 240) continue;
         float screenBearing = fmodf(geoBearing - g_northOffset + 360.0f, 360.0f);
         float diff          = fmodf(g_sweep - screenBearing + 360.0f, 360.0f);
-        if (diff < SWEEP_SPEED * g_sweepSpeed * 1.5f) {
+        if (diff < SWEEP_SPEED * g_sweepSpeed) {
             triggerPing(geoBearing, distKm, planes[i].callsign,
                         planes[i].flight, planes[i].reg, planes[i].acType,
                         altitudeColor(planes[i].altFt),
