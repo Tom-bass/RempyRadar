@@ -5,8 +5,8 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
-#include <LittleFS.h>
 #include <ArduinoJson.h>
+#include "index_html.h"
 
 static WebServer      g_server(80);
 static DNSServer      g_dns;
@@ -47,14 +47,7 @@ static void sendError(const char *msg) {
 // ---------------------------------------------------------------------------
 
 static void handleRoot() {
-    if (!LittleFS.exists("/index.html")) {
-        g_server.send(503, "text/plain",
-            "Setup page missing. Run: pio run --target uploadfs");
-        return;
-    }
-    File f = LittleFS.open("/index.html", "r");
-    g_server.streamFile(f, "text/html");
-    f.close();
+    g_server.send_P(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
 }
 
 static void handleSave() {
@@ -330,9 +323,6 @@ static void handleConfig() {
 // ---------------------------------------------------------------------------
 
 void portalStartSettingsServer() {
-    if (!LittleFS.begin(true)) {
-        Serial.println("Settings: LittleFS mount failed");
-    }
     g_server.on("/",                 handleRoot);
     g_server.on("/index.html",       handleRoot);
     g_server.on("/config",           handleConfig);
@@ -388,11 +378,6 @@ bool portalMagCorrectionPending(float &outDeg) {
 }
 
 void portalBegin() {
-    Serial.println("Portal: mounting LittleFS");
-    if (!LittleFS.begin(true)) {
-        Serial.println("Portal: LittleFS mount failed");
-    }
-
     WiFi.softAP("RempyRadar");
     delay(100);
     IPAddress ip = WiFi.softAPIP();

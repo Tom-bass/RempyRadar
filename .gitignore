@@ -1,6 +1,9 @@
 # PlatformIO build artefacts
 .pio/
 
+# Generated at build time from data/index.html
+include/index_html.h
+
 # IDE / editor
 .vscode/
 .claude/
